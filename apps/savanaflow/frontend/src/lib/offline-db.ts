@@ -21,7 +21,7 @@ interface SavanaFlowDB extends DBSchema {
       category_id: number | null;
       syncedAt: Date;
     };
-    indexes: { 'by-barcode': string };
+    indexes: { 'barcode': string };
   };
   customers: {
     key: number;

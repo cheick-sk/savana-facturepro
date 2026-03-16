@@ -209,7 +209,7 @@ export function t(key: string, options?: Record<string, any>): string {
 // Change language and persist
 export function changeLanguage(languageCode: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    i18n.changeLanguage(languageCode, (err) => {
+    i18n.changeLanguage(languageCode, (err: Error | null | undefined) => {
       if (err) {
         reject(err);
       } else {

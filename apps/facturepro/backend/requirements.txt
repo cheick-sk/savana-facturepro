@@ -22,7 +22,7 @@ qrcode[pil]==7.4.2
 
 # Async task queue
 celery[redis]==5.4.0
-redis==5.0.1
+redis>=4.5.2,<5.0.0
 
 # Two-Factor Authentication
 pyotp==2.9.0
