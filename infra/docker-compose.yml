@@ -66,6 +66,21 @@ services:
     logging:
       driver: "none"
 
+  # ─────────────── REDIS ───────────────
+  redis:
+    image: redis:7-alpine
+    container_name: redis_africa
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   # ─────────────── BACKENDS ───────────────
   facturepro_backend:
     build:
@@ -79,8 +94,12 @@ services:
       DATABASE_URL: postgresql+asyncpg://facturepro_user:facturepro_pass@postgres_facturepro:5432/facturepro
       SMTP_HOST: mailhog
       SMTP_PORT: "1025"
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER: redis://redis:6379/0
     depends_on:
       postgres_facturepro:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     ports:
       - "8001:8000"
@@ -104,8 +123,12 @@ services:
       DATABASE_URL: postgresql+asyncpg://schoolflow_user:schoolflow_pass@postgres_schoolflow:5432/schoolflow
       SMTP_HOST: mailhog
       SMTP_PORT: "1025"
+      REDIS_URL: redis://redis:6379/2
+      CELERY_BROKER: redis://redis:6379/2
     depends_on:
       postgres_schoolflow:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     ports:
       - "8002:8000"
@@ -129,8 +152,12 @@ services:
       DATABASE_URL: postgresql+asyncpg://savanaflow_user:savanaflow_pass@postgres_savanaflow:5432/savanaflow
       SMTP_HOST: mailhog
       SMTP_PORT: "1025"
+      REDIS_URL: redis://redis:6379/1
+      CELERY_BROKER: redis://redis:6379/1
     depends_on:
       postgres_savanaflow:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     ports:
       - "8003:8000"
@@ -141,6 +168,103 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+
+  # ─────────────── CELERY WORKERS ───────────────
+  facturepro_worker:
+    build:
+      context: ../apps/facturepro/backend
+      dockerfile: Dockerfile
+    container_name: facturepro_worker
+    restart: unless-stopped
+    env_file:
+      - ../apps/facturepro/backend/.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://facturepro_user:facturepro_pass@postgres_facturepro:5432/facturepro
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER: redis://redis:6379/0
+    command: celery -A app.celery_app worker --loglevel=info --concurrency=2
+    depends_on:
+      - redis
+      - postgres_facturepro
+
+  facturepro_beat:
+    build:
+      context: ../apps/facturepro/backend
+      dockerfile: Dockerfile
+    container_name: facturepro_beat
+    restart: unless-stopped
+    env_file:
+      - ../apps/facturepro/backend/.env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER: redis://redis:6379/0
+    command: celery -A app.celery_app beat --loglevel=info
+    depends_on:
+      - redis
+
+  savanaflow_worker:
+    build:
+      context: ../apps/savanaflow/backend
+      dockerfile: Dockerfile
+    container_name: savanaflow_worker
+    restart: unless-stopped
+    env_file:
+      - ../apps/savanaflow/backend/.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://savanaflow_user:savanaflow_pass@postgres_savanaflow:5432/savanaflow
+      REDIS_URL: redis://redis:6379/1
+      CELERY_BROKER: redis://redis:6379/1
+    command: celery -A app.celery_app worker --loglevel=info --concurrency=2
+    depends_on:
+      - redis
+      - postgres_savanaflow
+
+  savanaflow_beat:
+    build:
+      context: ../apps/savanaflow/backend
+      dockerfile: Dockerfile
+    container_name: savanaflow_beat
+    restart: unless-stopped
+    env_file:
+      - ../apps/savanaflow/backend/.env
+    environment:
+      REDIS_URL: redis://redis:6379/1
+      CELERY_BROKER: redis://redis:6379/1
+    command: celery -A app.celery_app beat --loglevel=info
+    depends_on:
+      - redis
+
+  schoolflow_worker:
+    build:
+      context: ../apps/schoolflow/backend
+      dockerfile: Dockerfile
+    container_name: schoolflow_worker
+    restart: unless-stopped
+    env_file:
+      - ../apps/schoolflow/backend/.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://schoolflow_user:schoolflow_pass@postgres_schoolflow:5432/schoolflow
+      REDIS_URL: redis://redis:6379/2
+      CELERY_BROKER: redis://redis:6379/2
+    command: celery -A app.celery_app worker --loglevel=info --concurrency=2
+    depends_on:
+      - redis
+      - postgres_schoolflow
+
+  schoolflow_beat:
+    build:
+      context: ../apps/schoolflow/backend
+      dockerfile: Dockerfile
+    container_name: schoolflow_beat
+    restart: unless-stopped
+    env_file:
+      - ../apps/schoolflow/backend/.env
+    environment:
+      REDIS_URL: redis://redis:6379/2
+      CELERY_BROKER: redis://redis:6379/2
+    command: celery -A app.celery_app beat --loglevel=info
+    depends_on:
+      - redis
 
   # ─────────────── FRONTENDS ───────────────
   facturepro_frontend:
@@ -206,6 +330,7 @@ volumes:
   facturepro_uploads:
   schoolflow_uploads:
   savanaflow_uploads:
+  redis_data:
 
 networks:
   default:

@@ -29,6 +29,14 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
     CORS_ORIGINS: str = "http://localhost:3002,http://schoolflow.localhost"
 
+    # Redis & Celery Configuration
+    REDIS_URL: str = "redis://localhost:6379/2"
+    CELERY_BROKER: str = "redis://localhost:6379/2"
+
+    # Rate Limiting
+    RATE_LIMIT_REQUESTS: int = 100
+    RATE_LIMIT_WINDOW_SECONDS: int = 60
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]

@@ -30,6 +30,14 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = "http://localhost:3003,http://savanaflow.localhost"
     LOW_STOCK_THRESHOLD: int = 10
 
+    # Redis & Celery Configuration
+    REDIS_URL: str = "redis://localhost:6379/1"
+    CELERY_BROKER: str = "redis://localhost:6379/1"
+
+    # Rate Limiting
+    RATE_LIMIT_REQUESTS: int = 100
+    RATE_LIMIT_WINDOW_SECONDS: int = 60
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]

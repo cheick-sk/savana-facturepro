@@ -1,4 +1,7 @@
-"""All SQLAlchemy models for FacturePro Africa — Production-Ready Edition."""
+"""All SQLAlchemy models for FacturePro Africa — Production-Ready Edition.
+
+Multi-tenant SaaS architecture with organisation-based isolation.
+"""
 from __future__ import annotations
 
 import enum
@@ -6,7 +9,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import (
     BigInteger, Boolean, DateTime, ForeignKey,
-    Integer, Numeric, String, Text, JSON,
+    Integer, Numeric, String, Text, JSON, Index,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -65,11 +68,108 @@ class RecurringFrequency(str, enum.Enum):
     YEARLY = "YEARLY"
 
 
+class SubscriptionStatus(str, enum.Enum):
+    ACTIVE = "active"
+    CANCELLED = "cancelled"
+    EXPIRED = "expired"
+    TRIAL = "trial"
+
+
+# ── TENANT MODELS (Multi-tenant) ───────────────────────────────
+
+class Organisation(Base):
+    """Tenant organisation - each customer is an organisation."""
+    __tablename__ = "organisations"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    slug: Mapped[str] = mapped_column(String(100), unique=True, nullable=False, index=True)
+    logo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    plan: Mapped[str] = mapped_column(String(20), default="starter", nullable=False)
+    currency: Mapped[str] = mapped_column(String(5), default="XOF", nullable=False)
+    country: Mapped[str] = mapped_column(String(50), default="Côte d'Ivoire", nullable=False)
+    phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    address: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tax_id: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+
+    users: Mapped[list["User"]] = relationship(back_populates="organisation", lazy="noload")
+    customers: Mapped[list["Customer"]] = relationship(back_populates="organisation", lazy="noload")
+    products: Mapped[list["Product"]] = relationship(back_populates="organisation", lazy="noload")
+    suppliers: Mapped[list["Supplier"]] = relationship(back_populates="organisation", lazy="noload")
+    categories: Mapped[list["ProductCategory"]] = relationship(back_populates="organisation", lazy="noload")
+    invoices: Mapped[list["Invoice"]] = relationship(back_populates="organisation", lazy="noload")
+    subscription: Mapped["Subscription | None"] = relationship(back_populates="organisation", lazy="selectin", uselist=False)
+    usage_quotas: Mapped[list["UsageQuota"]] = relationship(back_populates="organisation", lazy="noload")
+
+
+class Plan(Base):
+    """Subscription plans."""
+    __tablename__ = "plans"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    code: Mapped[str] = mapped_column(String(20), unique=True, nullable=False, index=True)
+    price_monthly: Mapped[float] = mapped_column(Numeric(12, 2), default=0.0, nullable=False)
+    price_yearly: Mapped[float] = mapped_column(Numeric(12, 2), default=0.0, nullable=False)
+    max_users: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    max_invoices_month: Mapped[int] = mapped_column(Integer, default=50, nullable=False)
+    max_products: Mapped[int] = mapped_column(Integer, default=100, nullable=False)
+    max_stores: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    features: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    subscriptions: Mapped[list["Subscription"]] = relationship(back_populates="plan", lazy="noload")
+
+
+class Subscription(Base):
+    """Organisation subscription to a plan."""
+    __tablename__ = "subscriptions"
+    __table_args__ = (
+        Index("ix_subscriptions_organisation_id", "organisation_id"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    organisation_id: Mapped[int] = mapped_column(ForeignKey("organisations.id"), nullable=False)
+    plan_id: Mapped[int] = mapped_column(ForeignKey("plans.id"), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)
+    current_period_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    current_period_end: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    stripe_subscription_id: Mapped[str | None] = mapped_column(String(100), unique=True, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+
+    organisation: Mapped["Organisation"] = relationship(back_populates="subscription", lazy="selectin")
+    plan: Mapped["Plan"] = relationship(back_populates="subscriptions", lazy="selectin")
+
+
+class UsageQuota(Base):
+    """Monthly usage tracking for quota enforcement."""
+    __tablename__ = "usage_quotas"
+    __table_args__ = (
+        Index("ix_usage_quotas_org_month_year", "organisation_id", "month", "year", unique=True),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    organisation_id: Mapped[int] = mapped_column(ForeignKey("organisations.id"), nullable=False)
+    month: Mapped[int] = mapped_column(Integer, nullable=False)
+    year: Mapped[int] = mapped_column(Integer, nullable=False)
+    invoices_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    users_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    products_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    stores_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+
+    organisation: Mapped["Organisation"] = relationship(back_populates="usage_quotas", lazy="selectin")
+
+
 # ── User ───────────────────────────────────────────────────────
 class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    organisation_id: Mapped[int | None] = mapped_column(ForeignKey("organisations.id"), nullable=True, index=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -79,6 +179,7 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
 
+    organisation: Mapped["Organisation | None"] = relationship(back_populates="users", lazy="selectin")
     invoices: Mapped[list["Invoice"]] = relationship(back_populates="created_by_user", lazy="noload")
     quotes: Mapped[list["Quote"]] = relationship(back_populates="created_by_user", lazy="noload")
     expenses: Mapped[list["Expense"]] = relationship(back_populates="user", lazy="noload")
@@ -94,6 +195,7 @@ class ProductCategory(Base):
     __tablename__ = "product_categories"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    organisation_id: Mapped[int] = mapped_column(ForeignKey("organisations.id"), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     parent_id: Mapped[int | None] = mapped_column(ForeignKey("product_categories.id"), nullable=True)
@@ -101,6 +203,7 @@ class ProductCategory(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 
+    organisation: Mapped["Organisation"] = relationship(back_populates="categories", lazy="selectin")
     parent: Mapped["ProductCategory | None"] = relationship(
         back_populates="children", remote_side="ProductCategory.id", lazy="selectin"
     )
@@ -113,6 +216,7 @@ class Supplier(Base):
     __tablename__ = "suppliers"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    organisation_id: Mapped[int] = mapped_column(ForeignKey("organisations.id"), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
@@ -127,6 +231,7 @@ class Supplier(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
 
+    organisation: Mapped["Organisation"] = relationship(back_populates="suppliers", lazy="selectin")
     purchase_orders: Mapped[list["PurchaseOrder"]] = relationship(back_populates="supplier", lazy="noload")
     products: Mapped[list["Product"]] = relationship(back_populates="supplier", lazy="noload")
 
@@ -136,6 +241,7 @@ class Customer(Base):
     __tablename__ = "customers"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    organisation_id: Mapped[int] = mapped_column(ForeignKey("organisations.id"), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
@@ -150,6 +256,7 @@ class Customer(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
 
+    organisation: Mapped["Organisation"] = relationship(back_populates="customers", lazy="selectin")
     invoices: Mapped[list["Invoice"]] = relationship(back_populates="customer", lazy="noload")
     quotes: Mapped[list["Quote"]] = relationship(back_populates="customer", lazy="noload")
     credit_notes: Mapped[list["CreditNote"]] = relationship(back_populates="customer", lazy="noload")
@@ -161,6 +268,7 @@ class Product(Base):
     __tablename__ = "products"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    organisation_id: Mapped[int] = mapped_column(ForeignKey("organisations.id"), nullable=False, index=True)
     category_id: Mapped[int | None] = mapped_column(ForeignKey("product_categories.id"), nullable=True)
     supplier_id: Mapped[int | None] = mapped_column(ForeignKey("suppliers.id"), nullable=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
@@ -175,6 +283,7 @@ class Product(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
 
+    organisation: Mapped["Organisation"] = relationship(back_populates="products", lazy="selectin")
     category: Mapped["ProductCategory | None"] = relationship(back_populates="products", lazy="selectin")
     supplier: Mapped["Supplier | None"] = relationship(back_populates="products", lazy="selectin")
 
@@ -184,6 +293,7 @@ class Invoice(Base):
     __tablename__ = "invoices"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    organisation_id: Mapped[int] = mapped_column(ForeignKey("organisations.id"), nullable=False, index=True)
     invoice_number: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
     customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"), nullable=False)
     created_by: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
@@ -206,6 +316,7 @@ class Invoice(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
 
+    organisation: Mapped["Organisation"] = relationship(back_populates="invoices", lazy="selectin")
     customer: Mapped["Customer"] = relationship(back_populates="invoices", lazy="selectin")
     created_by_user: Mapped["User"] = relationship(back_populates="invoices", lazy="selectin")
     quote: Mapped["Quote | None"] = relationship(back_populates="invoice", lazy="selectin")
@@ -259,6 +370,7 @@ class Quote(Base):
     __tablename__ = "quotes"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    organisation_id: Mapped[int] = mapped_column(ForeignKey("organisations.id"), nullable=False, index=True)
     quote_number: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
     customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"), nullable=False)
     created_by: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
@@ -304,6 +416,7 @@ class CreditNote(Base):
     __tablename__ = "credit_notes"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    organisation_id: Mapped[int] = mapped_column(ForeignKey("organisations.id"), nullable=False, index=True)
     credit_note_number: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
     invoice_id: Mapped[int | None] = mapped_column(ForeignKey("invoices.id"), nullable=True)
     customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"), nullable=False)
@@ -341,6 +454,7 @@ class ExpenseCategory(Base):
     __tablename__ = "expense_categories"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    organisation_id: Mapped[int] = mapped_column(ForeignKey("organisations.id"), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     color: Mapped[str | None] = mapped_column(String(10), nullable=True)
@@ -354,6 +468,7 @@ class Expense(Base):
     __tablename__ = "expenses"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    organisation_id: Mapped[int] = mapped_column(ForeignKey("organisations.id"), nullable=False, index=True)
     category_id: Mapped[int | None] = mapped_column(ForeignKey("expense_categories.id"), nullable=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     customer_id: Mapped[int | None] = mapped_column(ForeignKey("customers.id"), nullable=True)
@@ -381,6 +496,7 @@ class PurchaseOrder(Base):
     __tablename__ = "purchase_orders"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    organisation_id: Mapped[int] = mapped_column(ForeignKey("organisations.id"), nullable=False, index=True)
     po_number: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
     supplier_id: Mapped[int] = mapped_column(ForeignKey("suppliers.id"), nullable=False)
     created_by: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
@@ -422,6 +538,7 @@ class RecurringInvoice(Base):
     __tablename__ = "recurring_invoices"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    organisation_id: Mapped[int] = mapped_column(ForeignKey("organisations.id"), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"), nullable=False)
     created_by: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
@@ -446,6 +563,7 @@ class PaymentLink(Base):
     __tablename__ = "payment_links"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    organisation_id: Mapped[int] = mapped_column(ForeignKey("organisations.id"), nullable=False, index=True)
     token: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
     invoice_id: Mapped[int] = mapped_column(ForeignKey("invoices.id"), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -461,6 +579,7 @@ class AuditLog(Base):
     __tablename__ = "audit_logs"
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    organisation_id: Mapped[int | None] = mapped_column(ForeignKey("organisations.id"), nullable=True, index=True)
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     invoice_id: Mapped[int | None] = mapped_column(ForeignKey("invoices.id"), nullable=True)
     action: Mapped[str] = mapped_column(String(100), nullable=False)
