@@ -315,13 +315,14 @@ services:
       - "80:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    # Nginx can start even if backends are not ready (thanks to resolver + variable config)
+    # But we still want to ensure network connectivity
     depends_on:
       - facturepro_frontend
       - schoolflow_frontend
       - savanaflow_frontend
-      - facturepro_backend
-      - schoolflow_backend
-      - savanaflow_backend
+      # Note: We don't require backends to be healthy for nginx to start
+      # The nginx.conf uses dynamic DNS resolution to handle unavailable backends
 
 volumes:
   pg_facturepro:
