@@ -49,7 +49,7 @@ class Store(Base):
     address: Mapped[str | None] = mapped_column(Text, nullable=True)
     phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
     city: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    currency: Mapped[str] = mapped_column(String(5), default="XOF")
+    currency: Mapped[str] = mapped_column(String(5), default="GNF")  # Franc Guinéen par défaut
     tax_rate: Mapped[float] = mapped_column(Numeric(5, 2), default=0.0)
     receipt_header: Mapped[str | None] = mapped_column(Text, nullable=True)
     receipt_footer: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -296,7 +296,7 @@ class Sale(Base):
     payment_method: Mapped[str] = mapped_column(String(30), default="CASH")
     payment_reference: Mapped[str | None] = mapped_column(String(100), nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="COMPLETED")  # COMPLETED/REFUNDED/PARTIAL_REFUND
-    currency: Mapped[str] = mapped_column(String(5), default="XOF")
+    currency: Mapped[str] = mapped_column(String(5), default="GNF")  # Franc Guinéen par défaut
     loyalty_points_earned: Mapped[int] = mapped_column(Integer, default=0)
     loyalty_points_used: Mapped[int] = mapped_column(Integer, default=0)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -415,7 +415,7 @@ class PurchaseOrder(Base):
     expected_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     received_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     total_amount: Mapped[float] = mapped_column(Numeric(14, 2), default=0.0)
-    currency: Mapped[str] = mapped_column(String(5), default="XOF")
+    currency: Mapped[str] = mapped_column(String(5), default="GNF")  # Franc Guinéen par défaut
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 

@@ -1,6 +1,8 @@
 """Products + Variants + Stock endpoints — SavanaFlow."""
 from __future__ import annotations
 import logging
+import random
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +16,51 @@ from app.schemas.schemas import (
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/products", tags=["Products"])
+
+
+# ── Barcode Generation Utilities ─────────────────────────────────
+def calculate_ean13_checksum(code: str) -> str:
+    """Calculate EAN-13 checksum digit."""
+    if len(code) != 12:
+        code = code.zfill(12)[:12]
+    total = sum(int(digit) * (1 if i % 2 == 0 else 3) for i, digit in enumerate(code))
+    return str((10 - (total % 10)) % 10)
+
+
+def generate_ean13_barcode(prefix: str = "612") -> str:
+    """
+    Generate a valid EAN-13 barcode.
+    Prefix 612-614 is assigned to Guinea (OBI country code).
+    """
+    # Generate 9 random digits after the prefix (3 digits)
+    random_digits = ''.join([str(random.randint(0, 9)) for _ in range(9)])
+    base = prefix + random_digits
+    checksum = calculate_ean13_checksum(base)
+    return base + checksum
+
+
+def generate_sku(category_code: str = "GEN") -> str:
+    """Generate a unique SKU."""
+    date = datetime.now()
+    year_code = str(date.year)[2:]
+    month_code = str(date.month).zfill(2)
+    random_suffix = str(random.randint(0, 9999)).zfill(4)
+    return f"{category_code}-{year_code}{month_code}-{random_suffix}"
+
+
+@router.get("/barcode/generate")
+async def generate_barcode(
+    prefix: str = Query(default="612", description="EAN-13 prefix (612-614 for Guinea)"),
+    category_code: str = Query(default="GEN", description="Category code for SKU"),
+    _: User = Depends(get_current_user),
+):
+    """Generate a new barcode and SKU for a product."""
+    return {
+        "barcode": generate_ean13_barcode(prefix),
+        "sku": generate_sku(category_code),
+        "type": "EAN-13",
+        "country": "Guinea" if prefix.startswith("61") else "Custom"
+    }
 
 
 @router.get("", response_model=Paginated)

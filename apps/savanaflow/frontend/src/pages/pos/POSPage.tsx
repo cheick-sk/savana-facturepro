@@ -1,12 +1,21 @@
-import { useEffect, useState, useRef } from 'react'
-import { Search, Trash2, Plus, Minus, CreditCard, Smartphone, Banknote, Check } from 'lucide-react'
+import { useEffect, useState, useRef, useCallback } from 'react'
+import { 
+  Search, Trash2, Plus, Minus, CreditCard, Smartphone, Banknote, Check,
+  ScanBarcode, Printer, Receipt, Globe, ChevronDown, X, User, AlertCircle,
+  DollarSign, ArrowRightLeft, Package
+} from 'lucide-react'
 import api from '../../lib/api'
 import { useCartStore } from '../../store/cart'
+import { useCurrencyStore } from '../../store/currency'
+import { CURRENCIES, formatCurrency, convertCurrency, type Currency } from '../../lib/currency'
+import { validateBarcode, generateEAN13, generateProductBarcode } from '../../lib/barcode'
+import { generateReceiptHTML, generateReceiptNumber, printReceipt, type ReceiptData } from '../../lib/receipt'
 import toast from 'react-hot-toast'
 
-const fmt = (n: number) => new Intl.NumberFormat('fr-FR').format(Math.round(n * 100) / 100)
+const fmt = (n: number, currency: string = 'GNF') => formatCurrency(n, currency)
 
 export default function POSPage() {
+  // États
   const [products, setProducts] = useState<any[]>([])
   const [search, setSearch] = useState('')
   const [stores, setStores] = useState<any[]>([])
@@ -15,32 +24,109 @@ export default function POSPage() {
   const [discount, setDiscount] = useState(0)
   const [processing, setProcessing] = useState(false)
   const [lastSale, setLastSale] = useState<any>(null)
+  
+  // Scanner
+  const [showScanner, setShowScanner] = useState(false)
+  const [scannerMode, setScannerMode] = useState<'camera' | 'manual'>('manual')
+  const [manualBarcode, setManualBarcode] = useState('')
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const barcodeInputRef = useRef<HTMLInputElement>(null)
+  
+  // Multi-devises
+  const [showCurrencySelector, setShowCurrencySelector] = useState(false)
+  const [showExchangeCalculator, setShowExchangeCalculator] = useState(false)
+  const [exchangeAmount, setExchangeAmount] = useState(0)
+  const [exchangeFromCurrency, setExchangeFromCurrency] = useState('GNF')
+  const [exchangeToCurrency, setExchangeToCurrency] = useState('EUR')
+  
+  // Client
+  const [showCustomerSearch, setShowCustomerSearch] = useState(false)
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(null)
+  const [customerSearch, setCustomerSearch] = useState('')
+  const [customers, setCustomers] = useState<any[]>([])
+  
+  // Reçu
+  const [showReceipt, setShowReceipt] = useState(false)
+  const [receiptData, setReceiptData] = useState<ReceiptData | null>(null)
+  
+  // Stores
   const cart = useCartStore()
-  const barcodeRef = useRef<HTMLInputElement>(null)
+  const currencyStore = useCurrencyStore()
+  const activeCurrency = currencyStore.activeCurrency
 
+  // Charger les magasins
   useEffect(() => {
     api.get('/stores').then(r => {
       setStores(r.data)
-      if (r.data.length > 0) { setSelectedStore(r.data[0].id); cart.setStore(r.data[0].id) }
+      if (r.data.length > 0) { 
+        setSelectedStore(r.data[0].id)
+        cart.setStore(r.data[0].id)
+      }
     })
   }, [])
 
+  // Charger les produits
   useEffect(() => {
     if (!selectedStore) return
-    api.get('/products', { params: { store_id: selectedStore, size: 50, search: search || undefined } })
+    api.get('/products', { params: { store_id: selectedStore, size: 100, search: search || undefined } })
       .then(r => setProducts(r.data.items || []))
   }, [selectedStore, search])
 
+  // Charger les clients
+  useEffect(() => {
+    if (!showCustomerSearch) return
+    api.get('/customers', { params: { search: customerSearch || undefined, size: 20 } })
+      .then(r => setCustomers(r.data.items || []))
+      .catch(() => setCustomers([]))
+  }, [customerSearch, showCustomerSearch])
+
+  // Recherche par code-barres
   const lookupBarcode = async (code: string) => {
     if (!code.trim()) return
+    const validation = validateBarcode(code)
+    if (!validation.isValid) {
+      toast.error(`Code-barres invalide: ${code}`)
+      return
+    }
     try {
       const { data } = await api.get(`/products/barcode/${code.trim()}`)
       cart.addItem(data)
+      toast.success(`${data.name} ajouté au panier`)
       setSearch('')
-      if (barcodeRef.current) barcodeRef.current.value = ''
-    } catch { toast.error(`Produit introuvable: ${code}`) }
+      setManualBarcode('')
+    } catch { 
+      toast.error(`Produit introuvable: ${code}`) 
+    }
   }
 
+  // Scanner avec la caméra
+  const startCameraScan = useCallback(async () => {
+    if (!videoRef.current) return
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' }
+      })
+      videoRef.current.srcObject = stream
+      videoRef.current.play()
+      setScannerMode('camera')
+    } catch {
+      toast.error('Impossible d\'accéder à la caméra')
+      setScannerMode('manual')
+    }
+  }, [])
+
+  // Arrêter le scanner
+  const stopScanner = useCallback(() => {
+    if (videoRef.current?.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream
+      stream.getTracks().forEach(track => track.stop())
+      videoRef.current.srcObject = null
+    }
+    setShowScanner(false)
+    setManualBarcode('')
+  }, [])
+
+  // Traiter la vente
   const processSale = async () => {
     if (cart.items.length === 0) { toast.error('Panier vide'); return }
     if (!selectedStore) { toast.error('Sélectionnez un magasin'); return }
@@ -51,170 +137,518 @@ export default function POSPage() {
         items: cart.items.map(i => ({ product_id: i.product_id, quantity: i.quantity })),
         payment_method: paymentMethod,
         discount_amount: discount,
-        currency: 'XOF',
+        currency: activeCurrency.code,
+        customer_id: selectedCustomer?.id,
       })
       setLastSale(data)
+      
+      // Générer le reçu
+      const store = stores.find(s => s.id === selectedStore)
+      const receipt: ReceiptData = {
+        storeName: store?.name || 'SavanaFlow',
+        storeAddress: store?.address || 'Conakry, Guinée',
+        storePhone: store?.phone,
+        receiptNumber: data.sale_number || generateReceiptNumber(),
+        date: new Date(),
+        cashier: 'Caissier',
+        customerName: selectedCustomer?.name,
+        customerPhone: selectedCustomer?.phone,
+        items: cart.items.map(i => ({
+          name: i.name,
+          quantity: i.quantity,
+          unitPrice: i.unit_price,
+          taxRate: i.tax_rate,
+          lineTotal: i.line_total,
+          barcode: i.barcode
+        })),
+        subtotal: cart.subtotal(),
+        taxAmount: cart.tax(),
+        discountAmount: discount,
+        total: cart.total() - discount,
+        paymentMethod: paymentMethod,
+        currency: activeCurrency.code,
+        loyaltyPointsEarned: data.loyalty_points_earned,
+        footer: 'Merci de votre fidélité!'
+      }
+      
+      setReceiptData(receipt)
+      setShowReceipt(true)
+      
       cart.clear()
       setDiscount(0)
+      setSelectedCustomer(null)
       toast.success(`Vente ${data.sale_number} enregistrée !`)
     } catch (err: any) {
       toast.error(err?.response?.data?.detail || 'Erreur lors de la vente')
     } finally { setProcessing(false) }
   }
 
-  const totalWithDiscount = Math.max(0, cart.total() - discount)
+  // Calculs
+  const subtotal = cart.subtotal()
+  const taxAmount = cart.tax()
+  const totalBeforeDiscount = cart.total()
+  const totalWithDiscount = Math.max(0, totalBeforeDiscount - discount)
+  
+  // Conversion pour affichage
+  const displayTotal = activeCurrency.code === 'GNF' 
+    ? totalWithDiscount 
+    : convertCurrency(totalWithDiscount, 'GNF', activeCurrency.code)
+
+  // Conversion de devises
+  const convertedAmount = convertCurrency(exchangeAmount, exchangeFromCurrency, exchangeToCurrency)
+
+  // Imprimer le reçu
+  const handlePrintReceipt = () => {
+    if (receiptData) {
+      printReceipt(receiptData)
+    }
+  }
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 16, height: 'calc(100vh - 96px)' }}>
-      {/* LEFT: Product catalog */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div style={{ display: 'flex', gap: 10 }}>
-          {/* Store selector */}
-          <select value={selectedStore || ''} onChange={e => { const v = +e.target.value; setSelectedStore(v); cart.setStore(v) }} style={{ minWidth: 160 }}>
+    <div className="h-[calc(100vh-96px)] grid grid-cols-1 lg:grid-cols-[1fr_400px] gap-4">
+      {/* PARTIE GAUCHE: Catalogue produits */}
+      <div className="flex flex-col gap-3">
+        {/* Barre d'outils */}
+        <div className="flex flex-wrap gap-2 items-center">
+          {/* Sélecteur de magasin */}
+          <select 
+            value={selectedStore || ''} 
+            onChange={e => { const v = +e.target.value; setSelectedStore(v); cart.setStore(v) }}
+            className="min-w-[160px] px-3 py-2 border rounded-lg bg-white text-sm"
+          >
             {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
-          {/* Search / Barcode */}
-          <div style={{ flex: 1, position: 'relative' }}>
-            <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-secondary)' }} />
+          
+          {/* Sélecteur de devise */}
+          <div className="relative">
+            <button 
+              onClick={() => setShowCurrencySelector(!showCurrencySelector)}
+              className="flex items-center gap-2 px-3 py-2 border rounded-lg bg-white text-sm hover:bg-gray-50"
+            >
+              <Globe size={16} />
+              <span>{activeCurrency.flag} {activeCurrency.code}</span>
+              <ChevronDown size={14} />
+            </button>
+            
+            {showCurrencySelector && (
+              <div className="absolute top-full left-0 mt-1 w-64 bg-white border rounded-lg shadow-lg z-50 max-h-80 overflow-y-auto">
+                <div className="p-2 border-b bg-gray-50 flex justify-between items-center">
+                  <span className="text-xs font-medium">Sélectionner une devise</span>
+                  <button onClick={() => setShowCurrencySelector(false)}><X size={14} /></button>
+                </div>
+                {CURRENCIES.map(c => (
+                  <button
+                    key={c.code}
+                    onClick={() => { currencyStore.setActiveCurrency(c.code); setShowCurrencySelector(false) }}
+                    className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 ${activeCurrency.code === c.code ? 'bg-blue-50 text-blue-600' : ''}`}
+                  >
+                    <span className="text-lg">{c.flag}</span>
+                    <span className="flex-1">{c.name}</span>
+                    <span className="text-gray-400">{c.symbol}</span>
+                    {c.isDefault && <span className="text-xs bg-green-100 text-green-600 px-1 rounded">Défaut</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          
+          {/* Convertisseur de devises */}
+          <button 
+            onClick={() => setShowExchangeCalculator(!showExchangeCalculator)}
+            className="flex items-center gap-2 px-3 py-2 border rounded-lg bg-white text-sm hover:bg-gray-50"
+          >
+            <ArrowRightLeft size={16} />
+            <span>Convertir</span>
+          </button>
+          
+          {/* Scanner */}
+          <button 
+            onClick={() => setShowScanner(true)}
+            className="flex items-center gap-2 px-3 py-2 border rounded-lg bg-white text-sm hover:bg-gray-50"
+          >
+            <ScanBarcode size={16} />
+            <span>Scanner</span>
+          </button>
+          
+          {/* Recherche */}
+          <div className="flex-1 relative">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
-              ref={barcodeRef}
+              ref={barcodeInputRef}
               placeholder="Rechercher ou scanner code-barres..."
+              value={search}
               onChange={e => setSearch(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') lookupBarcode((e.target as HTMLInputElement).value) }}
-              style={{ paddingLeft: 32, width: '100%', boxSizing: 'border-box' }}
+              onKeyDown={e => { if (e.key === 'Enter') lookupBarcode(search) }}
+              className="w-full pl-10 pr-4 py-2 border rounded-lg text-sm"
             />
           </div>
         </div>
 
-        {/* Products grid */}
-        <div style={{ flex: 1, overflow: 'auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 8, alignContent: 'start' }}>
+        {/* Calculateur de change */}
+        {showExchangeCalculator && (
+          <div className="bg-white border rounded-lg p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-medium flex items-center gap-2">
+                <DollarSign size={16} />
+                Convertisseur de devises
+              </h3>
+              <button onClick={() => setShowExchangeCalculator(false)}><X size={16} /></button>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex-1">
+                <label className="text-xs text-gray-500">Montant</label>
+                <input
+                  type="number"
+                  value={exchangeAmount}
+                  onChange={e => setExchangeAmount(+e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg text-sm mt-1"
+                />
+              </div>
+              <div className="w-32">
+                <label className="text-xs text-gray-500">De</label>
+                <select
+                  value={exchangeFromCurrency}
+                  onChange={e => setExchangeFromCurrency(e.target.value)}
+                  className="w-full px-2 py-2 border rounded-lg text-sm mt-1"
+                >
+                  {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.code}</option>)}
+                </select>
+              </div>
+              <ArrowRightLeft size={20} className="text-gray-400 mt-5" />
+              <div className="w-32">
+                <label className="text-xs text-gray-500">Vers</label>
+                <select
+                  value={exchangeToCurrency}
+                  onChange={e => setExchangeToCurrency(e.target.value)}
+                  className="w-full px-2 py-2 border rounded-lg text-sm mt-1"
+                >
+                  {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.code}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="mt-3 p-3 bg-gray-50 rounded-lg text-center">
+              <span className="text-2xl font-bold">{formatCurrency(convertedAmount, exchangeToCurrency)}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Scanner */}
+        {showScanner && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl w-full max-w-md p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <ScanBarcode size={20} />
+                  Scanner un code-barres
+                </h3>
+                <button onClick={stopScanner} className="p-1 hover:bg-gray-100 rounded"><X size={20} /></button>
+              </div>
+              
+              {/* Onglets */}
+              <div className="flex gap-2 mb-4">
+                <button
+                  onClick={() => setScannerMode('manual')}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium ${scannerMode === 'manual' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100'}`}
+                >
+                  Saisie manuelle
+                </button>
+                <button
+                  onClick={() => startCameraScan()}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium ${scannerMode === 'camera' ? 'bg-blue-100 text-blue-600' : 'bg-gray-100'}`}
+                >
+                  Caméra
+                </button>
+              </div>
+              
+              {scannerMode === 'manual' ? (
+                <div className="space-y-4">
+                  <input
+                    type="text"
+                    value={manualBarcode}
+                    onChange={e => setManualBarcode(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { lookupBarcode(manualBarcode); stopScanner() } }}
+                    placeholder="Entrez le code-barres..."
+                    className="w-full px-4 py-3 border rounded-lg text-lg font-mono"
+                    autoFocus
+                  />
+                  <button
+                    onClick={() => { lookupBarcode(manualBarcode); stopScanner() }}
+                    disabled={!manualBarcode}
+                    className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium disabled:opacity-50"
+                  >
+                    Ajouter au panier
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="relative bg-black rounded-lg overflow-hidden aspect-video">
+                    <video ref={videoRef} className="w-full h-full object-cover" playsInline muted />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-48 h-32 border-2 border-white/50 rounded-lg" />
+                    </div>
+                  </div>
+                  <p className="text-center text-sm text-gray-500">
+                    Placez le code-barres dans le cadre
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Grille produits */}
+        <div className="flex-1 overflow-auto grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 content-start">
           {products.map(p => (
-            <button key={p.id} onClick={() => cart.addItem(p)} style={{
-              background: 'var(--color-background-primary)',
-              border: `0.5px solid ${p.is_low_stock ? 'var(--color-border-warning)' : 'var(--color-border-tertiary)'}`,
-              borderRadius: 'var(--border-radius-md)',
-              padding: '12px', textAlign: 'left', cursor: 'pointer',
-              transition: 'background .15s',
-            }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-background-secondary)')}
-              onMouseLeave={e => (e.currentTarget.style.background = 'var(--color-background-primary)')}
+            <button 
+              key={p.id} 
+              onClick={() => cart.addItem(p)} 
+              className={`bg-white border rounded-xl p-3 text-left transition-all hover:shadow-md hover:border-blue-300 ${p.is_low_stock ? 'border-orange-300' : 'border-gray-200'}`}
             >
-              <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
-              {p.category && <div style={{ fontSize: 10, color: 'var(--color-text-secondary)', marginBottom: 4 }}>{p.category}</div>}
-              <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>{fmt(p.sell_price)} XOF</div>
-              <div style={{ fontSize: 10, color: p.is_low_stock ? 'var(--color-text-warning)' : 'var(--color-text-secondary)', marginTop: 2 }}>
-                Stock: {fmt(p.stock_quantity)} {p.unit}
+              <div className="flex items-start justify-between gap-1">
+                <div className="font-medium text-sm text-gray-900 line-clamp-2">{p.name}</div>
+                {p.barcode && <Package size={12} className="text-gray-400 flex-shrink-0" />}
+              </div>
+              {p.category && <div className="text-xs text-gray-500 mt-1">{p.category}</div>}
+              <div className="mt-2 font-semibold text-blue-600">{fmt(p.sell_price, activeCurrency.code)}</div>
+              <div className={`text-xs mt-1 ${p.is_low_stock ? 'text-orange-500' : 'text-gray-400'}`}>
+                Stock: {p.stock_quantity} {p.unit}
               </div>
             </button>
           ))}
           {products.length === 0 && (
-            <div style={{ gridColumn: '1/-1', padding: 40, textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: 13 }}>
-              Aucun produit trouvé
+            <div className="col-span-full py-16 text-center text-gray-500">
+              <Package size={48} className="mx-auto mb-2 opacity-20" />
+              <p>Aucun produit trouvé</p>
             </div>
           )}
         </div>
       </div>
 
-      {/* RIGHT: Cart + Checkout */}
-      <div style={{ display: 'flex', flexDirection: 'column', background: 'var(--color-background-primary)', border: '0.5px solid var(--color-border-tertiary)', borderRadius: 'var(--border-radius-lg)', overflow: 'hidden' }}>
-        <div style={{ padding: '14px 16px', borderBottom: '0.5px solid var(--color-border-tertiary)', fontWeight: 500, fontSize: 14 }}>
-          Panier ({cart.items.length} article{cart.items.length !== 1 ? 's' : ''})
+      {/* PARTIE DROITE: Panier + Paiement */}
+      <div className="flex flex-col bg-white border rounded-xl overflow-hidden">
+        {/* En-tête panier */}
+        <div className="px-4 py-3 border-b flex items-center justify-between">
+          <h2 className="font-semibold">
+            Panier ({cart.items.length} article{cart.items.length !== 1 ? 's' : ''})
+          </h2>
+          <div className="flex items-center gap-2">
+            {/* Client */}
+            <button
+              onClick={() => setShowCustomerSearch(true)}
+              className={`flex items-center gap-1 px-2 py-1 text-xs rounded-lg ${selectedCustomer ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}
+            >
+              <User size={14} />
+              {selectedCustomer ? selectedCustomer.name : 'Client'}
+            </button>
+            {cart.items.length > 0 && (
+              <button onClick={() => cart.clear()} className="text-xs text-red-500 hover:underline">
+                Vider
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Cart items */}
-        <div style={{ flex: 1, overflow: 'auto', padding: '8px 0' }}>
+        {/* Modal recherche client */}
+        {showCustomerSearch && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl w-full max-w-md p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold">Rechercher un client</h3>
+                <button onClick={() => setShowCustomerSearch(false)}><X size={20} /></button>
+              </div>
+              <input
+                placeholder="Nom ou téléphone..."
+                value={customerSearch}
+                onChange={e => setCustomerSearch(e.target.value)}
+                className="w-full px-4 py-2 border rounded-lg mb-4"
+              />
+              <div className="max-h-64 overflow-auto">
+                {customers.map(c => (
+                  <button
+                    key={c.id}
+                    onClick={() => { setSelectedCustomer(c); setShowCustomerSearch(false) }}
+                    className="w-full px-4 py-2 text-left hover:bg-gray-50 rounded-lg flex items-center gap-3"
+                  >
+                    <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
+                      <User size={18} className="text-gray-400" />
+                    </div>
+                    <div>
+                      <div className="font-medium">{c.name}</div>
+                      <div className="text-sm text-gray-500">{c.phone}</div>
+                    </div>
+                  </button>
+                ))}
+                {customers.length === 0 && (
+                  <p className="text-center text-gray-500 py-8">Aucun client trouvé</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Articles du panier */}
+        <div className="flex-1 overflow-auto">
           {cart.items.length === 0 ? (
-            <div style={{ padding: 32, textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: 13 }}>
-              Scannez ou cliquez sur un produit
+            <div className="py-16 text-center text-gray-500">
+              <ScanBarcode size={32} className="mx-auto mb-2 opacity-30" />
+              <p className="text-sm">Scannez ou cliquez sur un produit</p>
             </div>
-          ) : cart.items.map(item => (
-            <div key={item.product_id} style={{ padding: '8px 14px', borderBottom: '0.5px solid var(--color-border-tertiary)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
-                <span style={{ fontSize: 12, fontWeight: 500, flex: 1, paddingRight: 8 }}>{item.name}</span>
-                <button onClick={() => cart.removeItem(item.product_id)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--color-text-secondary)', padding: 2 }}>
-                  <Trash2 size={12} />
-                </button>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <button onClick={() => cart.updateQty(item.product_id, item.quantity - 1)} style={{ border: '0.5px solid var(--color-border-secondary)', background: 'none', cursor: 'pointer', borderRadius: 4, width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Minus size={10} />
-                  </button>
-                  <span style={{ fontSize: 13, minWidth: 24, textAlign: 'center' }}>{item.quantity}</span>
-                  <button onClick={() => cart.updateQty(item.product_id, item.quantity + 1)} style={{ border: '0.5px solid var(--color-border-secondary)', background: 'none', cursor: 'pointer', borderRadius: 4, width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Plus size={10} />
-                  </button>
+          ) : (
+            <div className="divide-y">
+              {cart.items.map(item => (
+                <div key={item.product_id} className="px-4 py-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-sm truncate">{item.name}</div>
+                      {item.barcode && (
+                        <div className="text-xs text-gray-400 font-mono">{item.barcode}</div>
+                      )}
+                    </div>
+                    <button onClick={() => cart.removeItem(item.product_id)} className="text-gray-400 hover:text-red-500">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between mt-2">
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => cart.updateQty(item.product_id, item.quantity - 1)}
+                        className="w-7 h-7 rounded-lg border flex items-center justify-center hover:bg-gray-50"
+                      >
+                        <Minus size={12} />
+                      </button>
+                      <span className="w-8 text-center font-medium">{item.quantity}</span>
+                      <button 
+                        onClick={() => cart.updateQty(item.product_id, item.quantity + 1)}
+                        className="w-7 h-7 rounded-lg border flex items-center justify-center hover:bg-gray-50"
+                      >
+                        <Plus size={12} />
+                      </button>
+                    </div>
+                    <span className="font-medium">{fmt(item.line_total, activeCurrency.code)}</span>
+                  </div>
                 </div>
-                <span style={{ fontSize: 13, fontWeight: 500 }}>{fmt(item.line_total)} XOF</span>
-              </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
 
-        {/* Totals */}
-        <div style={{ padding: '12px 16px', borderTop: '0.5px solid var(--color-border-tertiary)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 4 }}>
-            <span>Sous-total</span><span>{fmt(cart.subtotal())} XOF</span>
+        {/* Totaux */}
+        <div className="border-t px-4 py-3 space-y-2">
+          <div className="flex justify-between text-sm text-gray-500">
+            <span>Sous-total</span>
+            <span>{fmt(subtotal, activeCurrency.code)}</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 4 }}>
-            <span>TVA</span><span>{fmt(cart.tax())} XOF</span>
+          <div className="flex justify-between text-sm text-gray-500">
+            <span>TVA</span>
+            <span>{fmt(taxAmount, activeCurrency.code)}</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-            <label style={{ fontSize: 12, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>Remise</label>
-            <input type="number" min="0" value={discount} onChange={e => setDiscount(+e.target.value)} style={{ width: 80 }} />
+          <div className="flex items-center justify-between gap-2">
+            <label className="text-sm text-gray-500">Remise</label>
+            <input 
+              type="number" 
+              min="0" 
+              value={discount} 
+              onChange={e => setDiscount(+e.target.value)} 
+              className="w-24 px-2 py-1 border rounded text-right text-sm"
+            />
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 500, paddingTop: 8, borderTop: '0.5px solid var(--color-border-tertiary)' }}>
-            <span>Total</span><span>{fmt(totalWithDiscount)} XOF</span>
+          <div className="flex justify-between text-lg font-bold pt-2 border-t">
+            <span>Total</span>
+            <span className="text-blue-600">{fmt(totalWithDiscount, activeCurrency.code)}</span>
           </div>
         </div>
 
-        {/* Payment method */}
-        <div style={{ padding: '0 16px 12px' }}>
-          <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 6 }}>Mode de paiement</div>
-          <div style={{ display: 'flex', gap: 6 }}>
+        {/* Mode de paiement */}
+        <div className="px-4 pb-3">
+          <div className="text-xs text-gray-500 mb-2">Mode de paiement</div>
+          <div className="grid grid-cols-3 gap-2">
             {[
               { key: 'CASH', icon: Banknote, label: 'Espèces' },
               { key: 'MOBILE_MONEY', icon: Smartphone, label: 'Mobile' },
               { key: 'CARD', icon: CreditCard, label: 'Carte' },
             ].map(({ key, icon: Icon, label }) => (
-              <button key={key} onClick={() => setPaymentMethod(key as any)} style={{
-                flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-                padding: '8px 4px', borderRadius: 'var(--border-radius-md)',
-                border: paymentMethod === key ? '1.5px solid var(--color-border-info)' : '0.5px solid var(--color-border-secondary)',
-                background: paymentMethod === key ? 'var(--color-background-info)' : 'none',
-                cursor: 'pointer', fontSize: 10, color: paymentMethod === key ? 'var(--color-text-info)' : 'var(--color-text-secondary)',
-              }}>
-                <Icon size={14} />{label}
+              <button 
+                key={key} 
+                onClick={() => setPaymentMethod(key as any)} 
+                className={`flex flex-col items-center gap-1 py-2 rounded-lg border transition-all ${
+                  paymentMethod === key 
+                    ? 'border-blue-500 bg-blue-50 text-blue-600' 
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <Icon size={18} />
+                <span className="text-xs">{label}</span>
               </button>
             ))}
           </div>
         </div>
 
-        {/* Submit */}
-        <div style={{ padding: '0 16px 16px' }}>
-          <button onClick={processSale} disabled={processing || cart.items.length === 0} style={{
-            width: '100%', padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            fontSize: 14, fontWeight: 500, cursor: 'pointer',
-            background: cart.items.length === 0 ? 'var(--color-background-secondary)' : 'var(--color-background-primary)',
-          }}>
-            <Check size={16} />
-            {processing ? 'Traitement...' : `Encaisser ${fmt(totalWithDiscount)} XOF`}
+        {/* Bouton de paiement */}
+        <div className="px-4 pb-4">
+          <button 
+            onClick={processSale} 
+            disabled={processing || cart.items.length === 0} 
+            className={`w-full py-3 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all ${
+              cart.items.length === 0 
+                ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                : 'bg-blue-600 text-white hover:bg-blue-700'
+            }`}
+          >
+            <Check size={18} />
+            {processing ? 'Traitement...' : `Encaisser ${fmt(totalWithDiscount, activeCurrency.code)}`}
           </button>
-          {cart.items.length > 0 && (
-            <button onClick={() => { cart.clear(); setDiscount(0) }} style={{ width: '100%', marginTop: 6, padding: '8px', fontSize: 12, color: 'var(--color-text-secondary)', background: 'none', border: 'none', cursor: 'pointer' }}>
-              Vider le panier
-            </button>
-          )}
         </div>
 
-        {/* Last sale confirmation */}
-        {lastSale && (
-          <div style={{ margin: '0 16px 16px', padding: '10px 12px', background: 'var(--color-background-success)', borderRadius: 'var(--border-radius-md)', border: '0.5px solid var(--color-border-success)' }}>
-            <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-success)' }}>Vente enregistrée</div>
-            <div style={{ fontSize: 11, color: 'var(--color-text-success)' }}>{lastSale.sale_number} — {fmt(lastSale.total_amount)} XOF</div>
+        {/* Dernière vente */}
+        {lastSale && !showReceipt && (
+          <div className="mx-4 mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="font-medium text-green-700">Vente enregistrée</div>
+                <div className="text-sm text-green-600">{lastSale.sale_number}</div>
+              </div>
+              <button 
+                onClick={() => setShowReceipt(true)}
+                className="flex items-center gap-1 px-3 py-1 bg-white border rounded-lg text-sm hover:bg-gray-50"
+              >
+                <Receipt size={14} />
+                Reçu
+              </button>
+            </div>
           </div>
         )}
       </div>
+
+      {/* Modal Reçu */}
+      {showReceipt && receiptData && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl w-full max-w-md max-h-[90vh] overflow-auto">
+            <div className="sticky top-0 bg-white border-b px-4 py-3 flex items-center justify-between">
+              <h3 className="font-semibold">Reçu de paiement</h3>
+              <button onClick={() => setShowReceipt(false)}><X size={20} /></button>
+            </div>
+            <div 
+              className="p-4"
+              dangerouslySetInnerHTML={{ __html: generateReceiptHTML(receiptData).replace(/<script[\s\S]*?<\/script>/gi, '') }}
+            />
+            <div className="sticky bottom-0 bg-white border-t px-4 py-3 flex gap-2">
+              <button 
+                onClick={handlePrintReceipt}
+                className="flex-1 py-2 bg-blue-600 text-white rounded-lg flex items-center justify-center gap-2"
+              >
+                <Printer size={16} />
+                Imprimer
+              </button>
+              <button 
+                onClick={() => setShowReceipt(false)}
+                className="flex-1 py-2 border rounded-lg"
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

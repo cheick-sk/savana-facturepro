@@ -47,7 +47,7 @@ class StoreCreate(BaseModel):
     address: str | None = None
     phone: str | None = Field(None, max_length=30)
     city: str | None = Field(None, max_length=100)
-    currency: str = Field(default="XOF", max_length=5)
+    currency: str = Field(default="GNF", max_length=5)  # Franc Guinéen par défaut
     tax_rate: float = Field(default=0.0, ge=0, le=100)
     receipt_header: str | None = None
     receipt_footer: str | None = None
@@ -348,7 +348,7 @@ class SaleCreate(BaseModel):
     loyalty_points_to_use: int = Field(default=0, ge=0)
     payment_method: str = Field(default="CASH", pattern="^(CASH|MOBILE_MONEY|CARD|WAVE|OM|MTN|TRANSFER|SPLIT)$")
     payment_reference: str | None = Field(None, max_length=100)
-    currency: str = Field(default="XOF", max_length=5)
+    currency: str = Field(default="GNF", max_length=5)  # Franc Guinéen par défaut
     notes: str | None = None
     items: list[SaleItemCreate] = Field(min_length=1)
 
