@@ -1,310 +1,477 @@
 import { useEffect, useState } from 'react'
-import { Plus, Search, Edit2, ScanBarcode, RefreshCw, Printer, QrCode } from 'lucide-react'
+import { 
+  Plus, Search, Filter, MoreVertical, Edit2, Trash2, 
+  Package, AlertTriangle, CheckCircle, ChevronDown, 
+  Grid, List, Download, Upload
+} from 'lucide-react'
 import api from '../../lib/api'
-import { useCurrencyStore } from '../../store/currency'
-import { formatCurrency } from '../../lib/currency'
 import toast from 'react-hot-toast'
 
-const EMPTY = { store_id: '', name: '', barcode: '', sku: '', category: '', unit: 'unit', sell_price: '', cost_price: '0', tax_rate: '0', stock_quantity: '0', low_stock_threshold: '10' }
+interface Product {
+  id: number
+  name: string
+  sku: string
+  barcode?: string
+  category?: string
+  sell_price: number
+  cost_price: number
+  stock_quantity: number
+  unit: string
+  is_active: boolean
+  is_low_stock: boolean
+  min_stock_level?: number
+}
+
+const fmt = (n: number) => new Intl.NumberFormat('fr-FR').format(n)
 
 export default function ProductsPage() {
-  const [products, setProducts] = useState<any[]>([])
-  const [total, setTotal] = useState(0)
-  const [page, setPage] = useState(1)
+  const [products, setProducts] = useState<Product[]>([])
+  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [stores, setStores] = useState<any[]>([])
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const [selectedCategory, setSelectedCategory] = useState<string>('all')
+  const [showFilters, setShowFilters] = useState(false)
   const [showForm, setShowForm] = useState(false)
-  const [editing, setEditing] = useState<any>(null)
-  const [form, setForm] = useState<any>(EMPTY)
-  const [generatingBarcode, setGeneratingBarcode] = useState(false)
-  
-  const currencyStore = useCurrencyStore()
-  const activeCurrency = currencyStore.activeCurrency
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null)
+  const [form, setForm] = useState({
+    name: '', sku: '', category: '', sell_price: 0, cost_price: 0,
+    stock_quantity: 0, unit: 'pièce', min_stock_level: 5
+  })
 
-  const fmt = (n: number) => formatCurrency(n, activeCurrency.code)
+  const categories = ['all', 'Alimentation', 'Boissons', 'Hygiène', 'Ménager', 'Autres']
 
-  const load = () => {
-    api.get('/products', { params: { page, size: 20, search: search || undefined } })
-      .then(r => { setProducts(r.data.items); setTotal(r.data.total) })
-  }
-  useEffect(() => { api.get('/stores').then(r => setStores(r.data)) }, [])
-  useEffect(() => { load() }, [page, search])
+  useEffect(() => {
+    setLoading(true)
+    api.get('/products', { params: { size: 100, search: search || undefined } })
+      .then(r => setProducts(r.data.items || []))
+      .catch(() => toast.error('Erreur lors du chargement'))
+      .finally(() => setLoading(false))
+  }, [search])
 
-  const f = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setForm((p: any) => ({ ...p, [k]: e.target.value }))
-
-  // Générer un code-barres automatiquement
-  const generateBarcode = async () => {
-    setGeneratingBarcode(true)
-    try {
-      const { data } = await api.get('/products/barcode/generate')
-      setForm((p: any) => ({ ...p, barcode: data.barcode, sku: data.sku }))
-      toast.success(`Code-barres généré: ${data.barcode}`)
-    } catch {
-      toast.error('Erreur lors de la génération du code-barres')
-    } finally {
-      setGeneratingBarcode(false)
-    }
-  }
-
-  // Imprimer l'étiquette du produit
-  const printLabel = (product: any) => {
-    const labelHTML = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Étiquette - ${product.name}</title>
-        <style>
-          body { font-family: Arial, sans-serif; margin: 0; padding: 10mm; }
-          .label { width: 50mm; padding: 3mm; border: 1px solid #000; }
-          .name { font-size: 12pt; font-weight: bold; margin-bottom: 2mm; }
-          .barcode { font-family: 'Libre Barcode 39', cursive; font-size: 24pt; text-align: center; margin: 2mm 0; }
-          .barcode-text { font-size: 8pt; text-align: center; letter-spacing: 2px; }
-          .price { font-size: 14pt; font-weight: bold; text-align: right; }
-          .sku { font-size: 8pt; color: #666; }
-        </style>
-      </head>
-      <body>
-        <div class="label">
-          <div class="name">${product.name}</div>
-          <div class="barcode">*${product.barcode || 'N/A'}*</div>
-          <div class="barcode-text">${product.barcode || 'N/A'}</div>
-          <div class="price">${fmt(product.sell_price)}</div>
-          ${product.sku ? `<div class="sku">SKU: ${product.sku}</div>` : ''}
-        </div>
-      </body>
-      </html>
-    `
-    const printWindow = window.open('', '_blank')
-    if (printWindow) {
-      printWindow.document.write(labelHTML)
-      printWindow.document.close()
-      printWindow.print()
-    }
-  }
+  const filteredProducts = products.filter(p => 
+    selectedCategory === 'all' || p.category === selectedCategory
+  )
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const payload = { ...form, store_id: +form.store_id, sell_price: +form.sell_price, cost_price: +form.cost_price, tax_rate: +form.tax_rate, stock_quantity: +form.stock_quantity, low_stock_threshold: +form.low_stock_threshold }
     try {
-      if (editing) { await api.put(`/products/${editing.id}`, payload); toast.success('Produit mis à jour') }
-      else { await api.post('/products', payload); toast.success('Produit créé') }
-      setShowForm(false); setEditing(null); setForm(EMPTY); load()
-    } catch (err: any) { toast.error(err?.response?.data?.detail || 'Erreur') }
+      if (editingProduct) {
+        await api.put(`/products/${editingProduct.id}`, form)
+        toast.success('Produit mis à jour')
+      } else {
+        await api.post('/products', form)
+        toast.success('Produit créé')
+      }
+      setShowForm(false)
+      setEditingProduct(null)
+      setForm({ name: '', sku: '', category: '', sell_price: 0, cost_price: 0, stock_quantity: 0, unit: 'pièce', min_stock_level: 5 })
+      api.get('/products', { params: { size: 100 } }).then(r => setProducts(r.data.items || []))
+    } catch { toast.error('Erreur lors de la sauvegarde') }
   }
 
-  const openEdit = (p: any) => {
-    setEditing(p)
-    setForm({ ...p, store_id: String(p.store_id), sell_price: String(p.sell_price), cost_price: String(p.cost_price), tax_rate: String(p.tax_rate), stock_quantity: String(p.stock_quantity), low_stock_threshold: String(p.low_stock_threshold) })
+  const openEdit = (product: Product) => {
+    setEditingProduct(product)
+    setForm({
+      name: product.name,
+      sku: product.sku,
+      category: product.category || '',
+      sell_price: product.sell_price,
+      cost_price: product.cost_price,
+      stock_quantity: product.stock_quantity,
+      unit: product.unit,
+      min_stock_level: product.min_stock_level || 5
+    })
     setShowForm(true)
   }
 
+  const deleteProduct = async (id: number) => {
+    if (!confirm('Supprimer ce produit ?')) return
+    try {
+      await api.delete(`/products/${id}`)
+      toast.success('Produit supprimé')
+      setProducts(products.filter(p => p.id !== id))
+    } catch { toast.error('Erreur lors de la suppression') }
+  }
+
   return (
-    <div>
-      <div className="flex justify-between items-center mb-5">
+    <div className="space-y-6 animate-fadeIn">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-xl font-medium m-0">Produits</h1>
-          <p className="text-sm text-gray-500 mt-1 mb-0">{total} produit(s)</p>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">Produits</h1>
+          <p className="text-sm text-[var(--text-secondary)] mt-1">
+            {products.length} produits au total
+          </p>
         </div>
-        <div className="flex gap-2">
-          <button 
-            onClick={() => currencyStore.setActiveCurrency(currencyStore.activeCurrency.code === 'GNF' ? 'XOF' : 'GNF')}
-            className="flex items-center gap-2 px-3 py-2 border rounded-lg text-sm hover:bg-gray-50"
-          >
-            {currencyStore.activeCurrency.flag} {currencyStore.activeCurrency.code}
+        
+        <div className="flex items-center gap-3">
+          <button className="btn-ghost btn-sm">
+            <Upload size={16} />
+            <span className="hidden sm:inline">Importer</span>
+          </button>
+          <button className="btn-ghost btn-sm">
+            <Download size={16} />
+            <span className="hidden sm:inline">Exporter</span>
           </button>
           <button 
-            onClick={() => { setEditing(null); setForm({ ...EMPTY, store_id: stores[0]?.id || '' }); setShowForm(true) }} 
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
+            onClick={() => { setEditingProduct(null); setShowForm(true) }}
+            className="btn-primary btn-sm"
           >
-            <Plus size={16} /> Nouveau produit
+            <Plus size={16} />
+            <span>Nouveau produit</span>
           </button>
         </div>
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-sm mb-4">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input 
-          placeholder="Rechercher nom, code-barres, SKU..." 
-          className="w-full pl-10 pr-4 py-2 border rounded-lg text-sm"
-          onChange={e => { setSearch(e.target.value); setPage(1) }} 
-        />
+      {/* Search and filters */}
+      <div className="card">
+        <div className="card-body p-4">
+          <div className="flex flex-col sm:flex-row gap-3">
+            {/* Search */}
+            <div className="relative flex-1">
+              <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" />
+              <input
+                type="text"
+                placeholder="Rechercher un produit..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl"
+              />
+            </div>
+
+            {/* Category filter */}
+            <div className="flex items-center gap-2">
+              <select
+                value={selectedCategory}
+                onChange={e => setSelectedCategory(e.target.value)}
+                className="px-4 py-2.5 rounded-xl min-w-[140px]"
+              >
+                <option value="all">Toutes catégories</option>
+                {categories.filter(c => c !== 'all').map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+              
+              <button 
+                onClick={() => setShowFilters(!showFilters)}
+                className={`p-2.5 rounded-xl border transition-colors ${showFilters ? 'border-[var(--primary-500)] bg-[var(--primary-50)] text-[var(--primary-600)]' : 'border-[var(--border-default)]'}`}
+              >
+                <Filter size={18} />
+              </button>
+              
+              <div className="flex items-center border border-[var(--border-default)] rounded-xl overflow-hidden">
+                <button 
+                  onClick={() => setViewMode('grid')}
+                  className={`p-2.5 ${viewMode === 'grid' ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)]' : 'text-[var(--text-tertiary)]'}`}
+                >
+                  <Grid size={18} />
+                </button>
+                <button 
+                  onClick={() => setViewMode('list')}
+                  className={`p-2.5 ${viewMode === 'list' ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)]' : 'text-[var(--text-tertiary)]'}`}
+                >
+                  <List size={18} />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Expanded filters */}
+          {showFilters && (
+            <div className="mt-4 pt-4 border-t border-[var(--border-light)] grid grid-cols-2 sm:grid-cols-4 gap-3 animate-slideDown">
+              <div>
+                <label className="text-xs text-[var(--text-tertiary)] mb-1 block">Prix min</label>
+                <input type="number" placeholder="0" className="w-full" />
+              </div>
+              <div>
+                <label className="text-xs text-[var(--text-tertiary)] mb-1 block">Prix max</label>
+                <input type="number" placeholder="∞" className="w-full" />
+              </div>
+              <div>
+                <label className="text-xs text-[var(--text-tertiary)] mb-1 block">Stock</label>
+                <select className="w-full">
+                  <option>Tous</option>
+                  <option>En stock</option>
+                  <option>Stock faible</option>
+                  <option>Rupture</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-[var(--text-tertiary)] mb-1 block">Statut</label>
+                <select className="w-full">
+                  <option>Tous</option>
+                  <option>Actif</option>
+                  <option>Inactif</option>
+                </select>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Form */}
-      {showForm && (
-        <div className="bg-white border rounded-xl p-5 mb-4 shadow-sm">
-          <h3 className="m-0 mb-4 text-base font-medium">{editing ? 'Modifier' : 'Nouveau'} produit</h3>
-          <form onSubmit={submit}>
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-4">
-              {!editing && (
-                <div>
-                  <label className="text-xs text-gray-500 block mb-1">Magasin *</label>
-                  <select value={form.store_id} onChange={f('store_id')} required className="w-full px-3 py-2 border rounded-lg text-sm">
-                    <option value="">-- Choisir --</option>
-                    {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
+      {/* Products grid/list */}
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+            <div key={i} className="skeleton h-48 rounded-xl" />
+          ))}
+        </div>
+      ) : viewMode === 'grid' ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {filteredProducts.map(product => (
+            <div 
+              key={product.id} 
+              className="card group cursor-pointer hover:shadow-lg transition-all hover:border-[var(--primary-300)]"
+            >
+              <div className="p-4">
+                {/* Product image placeholder */}
+                <div className="h-32 rounded-lg bg-gradient-to-br from-[var(--bg-secondary)] to-[var(--bg-tertiary)] flex items-center justify-center mb-3 group-hover:from-emerald-50 group-hover:to-teal-50 transition-all">
+                  <Package size={32} className="text-[var(--text-tertiary)] group-hover:text-emerald-500 transition-colors" />
                 </div>
-              )}
-              
-              {/* Nom */}
-              <div className="col-span-2">
-                <label className="text-xs text-gray-500 block mb-1">Nom *</label>
-                <input type="text" value={form.name} onChange={f('name')} required className="w-full px-3 py-2 border rounded-lg text-sm" />
+                
+                {/* Product info */}
+                <div className="space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="font-medium text-[var(--text-primary)] line-clamp-2">{product.name}</h3>
+                    <div className="flex-shrink-0 relative">
+                      <button className="p-1.5 rounded-lg hover:bg-[var(--bg-secondary)] text-[var(--text-tertiary)] opacity-0 group-hover:opacity-100 transition-opacity">
+                        <MoreVertical size={16} />
+                      </button>
+                      {/* Dropdown would go here */}
+                    </div>
+                  </div>
+                  
+                  {product.category && (
+                    <span className="badge badge-primary">{product.category}</span>
+                  )}
+                  
+                  <div className="flex items-center justify-between pt-2">
+                    <div className="text-lg font-bold text-emerald-600">
+                      {fmt(product.sell_price)} GNF
+                    </div>
+                    <div className={`flex items-center gap-1 text-xs ${product.is_low_stock ? 'text-amber-600' : 'text-[var(--text-secondary)]'}`}>
+                      {product.is_low_stock ? <AlertTriangle size={12} /> : <CheckCircle size={12} />}
+                      {product.stock_quantity} {product.unit}
+                    </div>
+                  </div>
+                </div>
               </div>
               
-              {/* Code-barres avec génération */}
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">Code-barres</label>
-                <div className="flex gap-1">
-                  <input type="text" value={form.barcode} onChange={f('barcode')} className="flex-1 px-3 py-2 border rounded-lg text-sm font-mono" placeholder="EAN-13" />
-                  <button 
-                    type="button" 
-                    onClick={generateBarcode} 
-                    disabled={generatingBarcode}
-                    className="px-2 py-2 border rounded-lg hover:bg-gray-50 disabled:opacity-50"
-                    title="Générer un code-barres"
-                  >
-                    <RefreshCw size={16} className={generatingBarcode ? 'animate-spin' : ''} />
-                  </button>
-                </div>
+              {/* Quick actions on hover */}
+              <div className="border-t border-[var(--border-light)] p-2 flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button 
+                  onClick={() => openEdit(product)}
+                  className="p-2 rounded-lg hover:bg-[var(--bg-secondary)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)]"
+                >
+                  <Edit2 size={14} />
+                </button>
+                <button 
+                  onClick={() => deleteProduct(product.id)}
+                  className="p-2 rounded-lg hover:bg-red-50 text-[var(--text-tertiary)] hover:text-red-600"
+                >
+                  <Trash2 size={14} />
+                </button>
               </div>
-              
-              {/* SKU */}
-              <div>
-                <label className="text-xs text-gray-500 block mb-1">SKU</label>
-                <input type="text" value={form.sku} onChange={f('sku')} className="w-full px-3 py-2 border rounded-lg text-sm font-mono" />
-              </div>
-              
-              {/* Autres champs */}
-              {[
-                { k: 'category', label: 'Catégorie' },
-                { k: 'unit', label: 'Unité' },
-                { k: 'sell_price', label: `Prix vente (${activeCurrency.symbol}) *`, type: 'number', req: true },
-                { k: 'cost_price', label: `Prix coût (${activeCurrency.symbol})`, type: 'number' },
-                { k: 'tax_rate', label: 'TVA %', type: 'number' },
-                { k: 'stock_quantity', label: 'Stock initial', type: 'number' },
-                { k: 'low_stock_threshold', label: 'Seuil alerte', type: 'number' },
-              ].map(({ k, label, type = 'text', req }) => (
-                <div key={k}>
-                  <label className="text-xs text-gray-500 block mb-1">{label}</label>
-                  <input 
-                    type={type as any} 
-                    value={form[k]} 
-                    onChange={f(k)} 
-                    required={req as any} 
-                    step={(type === 'number') ? '0.01' : undefined}
-                    className="w-full px-3 py-2 border rounded-lg text-sm" 
-                  />
-                </div>
-              ))}
             </div>
-            
-            <div className="flex gap-2">
-              <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
-                {editing ? 'Mettre à jour' : 'Créer'}
-              </button>
-              <button type="button" onClick={() => { setShowForm(false); setEditing(null) }} className="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50">
-                Annuler
-              </button>
-            </div>
-          </form>
+          ))}
+        </div>
+      ) : (
+        <div className="card overflow-hidden">
+          <div className="overflow-x-auto">
+            <table>
+              <thead>
+                <tr>
+                  <th>Produit</th>
+                  <th>Catégorie</th>
+                  <th>Prix d'achat</th>
+                  <th>Prix de vente</th>
+                  <th>Stock</th>
+                  <th>Statut</th>
+                  <th className="w-20">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredProducts.map(product => (
+                  <tr key={product.id} className="hover:bg-[var(--bg-secondary)]">
+                    <td>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-[var(--bg-tertiary)] flex items-center justify-center">
+                          <Package size={18} className="text-[var(--text-tertiary)]" />
+                        </div>
+                        <div>
+                          <div className="font-medium text-[var(--text-primary)]">{product.name}</div>
+                          <div className="text-xs text-[var(--text-tertiary)]">{product.sku}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      {product.category && (
+                        <span className="badge badge-primary">{product.category}</span>
+                      )}
+                    </td>
+                    <td>{fmt(product.cost_price)} GNF</td>
+                    <td className="font-medium text-emerald-600">{fmt(product.sell_price)} GNF</td>
+                    <td>
+                      <div className={`flex items-center gap-1 ${product.is_low_stock ? 'text-amber-600' : ''}`}>
+                        {product.is_low_stock && <AlertTriangle size={14} />}
+                        {product.stock_quantity} {product.unit}
+                      </div>
+                    </td>
+                    <td>
+                      <span className={`badge ${product.is_active ? 'badge-success' : 'badge-danger'}`}>
+                        {product.is_active ? 'Actif' : 'Inactif'}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="flex items-center gap-1">
+                        <button 
+                          onClick={() => openEdit(product)}
+                          className="p-1.5 rounded-lg hover:bg-[var(--bg-tertiary)] text-[var(--text-tertiary)]"
+                        >
+                          <Edit2 size={14} />
+                        </button>
+                        <button 
+                          onClick={() => deleteProduct(product.id)}
+                          className="p-1.5 rounded-lg hover:bg-red-50 text-[var(--text-tertiary)] hover:text-red-600"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
-      {/* Table */}
-      <div className="bg-white border rounded-xl overflow-hidden shadow-sm">
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b bg-gray-50">
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Produit</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Catégorie</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Code-barres</th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">Prix</th>
-              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">Stock</th>
-              <th className="px-4 py-3 text-center text-xs font-medium text-gray-500">Statut</th>
-              <th className="px-4 py-3 text-center text-xs font-medium text-gray-500">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {products.map(p => (
-              <tr key={p.id} className="border-b hover:bg-gray-50">
-                <td className="px-4 py-3">
-                  <div className="font-medium">{p.name}</div>
-                  {p.sku && <div className="text-xs text-gray-400">{p.sku}</div>}
-                </td>
-                <td className="px-4 py-3 text-gray-500">{p.category || '—'}</td>
-                <td className="px-4 py-3">
-                  {p.barcode ? (
-                    <div className="flex items-center gap-2">
-                      <QrCode size={14} className="text-gray-400" />
-                      <code className="text-xs bg-gray-100 px-2 py-0.5 rounded">{p.barcode}</code>
-                    </div>
-                  ) : (
-                    <span className="text-gray-300">—</span>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-right font-medium">{fmt(p.sell_price)}</td>
-                <td className="px-4 py-3 text-right">
-                  <span className={p.is_low_stock ? 'text-orange-500 font-medium' : ''}>
-                    {p.stock_quantity} {p.unit}
-                    {p.is_low_stock && <span className="ml-1 text-xs">⚠️</span>}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-center">
-                  <span className={`text-xs px-2 py-1 rounded-full ${p.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                    {p.is_active ? 'Actif' : 'Inactif'}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center justify-center gap-1">
-                    {p.barcode && (
-                      <button 
-                        onClick={() => printLabel(p)} 
-                        className="p-1.5 hover:bg-gray-100 rounded-lg" 
-                        title="Imprimer étiquette"
-                      >
-                        <Printer size={14} className="text-gray-500" />
-                      </button>
-                    )}
-                    <button onClick={() => openEdit(p)} className="p-1.5 hover:bg-gray-100 rounded-lg" title="Modifier">
-                      <Edit2 size={14} className="text-gray-500" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {products.length === 0 && (
-          <div className="py-12 text-center text-gray-400">
-            <ScanBarcode size={32} className="mx-auto mb-2 opacity-30" />
-            <p>Aucun produit trouvé</p>
+      {/* Empty state */}
+      {!loading && filteredProducts.length === 0 && (
+        <div className="empty-state">
+          <Package size={64} className="empty-state-icon" />
+          <div className="empty-state-title">Aucun produit trouvé</div>
+          <div className="empty-state-description">
+            {search ? 'Essayez une autre recherche' : 'Commencez par ajouter un produit'}
           </div>
-        )}
-      </div>
-
-      {/* Pagination */}
-      <div className="flex justify-between items-center mt-4 text-sm text-gray-500">
-        <span>{total} produit(s)</span>
-        <div className="flex gap-2">
           <button 
-            disabled={page === 1} 
-            onClick={() => setPage(p => p - 1)}
-            className="px-3 py-1.5 border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            onClick={() => setShowForm(true)}
+            className="btn-primary mt-4"
           >
-            Précédent
-          </button>
-          <span className="px-3 py-1.5">Page {page}</span>
-          <button 
-            disabled={products.length < 20} 
-            onClick={() => setPage(p => p + 1)}
-            className="px-3 py-1.5 border rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-          >
-            Suivant
+            <Plus size={16} />
+            Ajouter un produit
           </button>
         </div>
-      </div>
+      )}
+
+      {/* Product form modal */}
+      {showForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 animate-fadeIn" onClick={() => setShowForm(false)}>
+          <div 
+            className="w-full max-w-lg bg-[var(--bg-primary)] rounded-2xl shadow-2xl animate-slideUp overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="px-6 py-4 border-b border-[var(--border-light)] flex items-center justify-between">
+              <h2 className="font-semibold text-lg">
+                {editingProduct ? 'Modifier le produit' : 'Nouveau produit'}
+              </h2>
+              <button onClick={() => setShowForm(false)} className="p-1.5 rounded-lg hover:bg-[var(--bg-secondary)]">
+                <MoreVertical size={18} />
+              </button>
+            </div>
+            
+            <form onSubmit={submit} className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="text-sm text-[var(--text-secondary)] mb-1 block">Nom du produit *</label>
+                  <input 
+                    value={form.name} 
+                    onChange={e => setForm({...form, name: e.target.value})} 
+                    required 
+                    placeholder="Ex: Riz 5kg Premium"
+                  />
+                </div>
+                
+                <div>
+                  <label className="text-sm text-[var(--text-secondary)] mb-1 block">SKU</label>
+                  <input 
+                    value={form.sku} 
+                    onChange={e => setForm({...form, sku: e.target.value})} 
+                    placeholder="RIZ-5KG"
+                  />
+                </div>
+                
+                <div>
+                  <label className="text-sm text-[var(--text-secondary)] mb-1 block">Catégorie</label>
+                  <select 
+                    value={form.category} 
+                    onChange={e => setForm({...form, category: e.target.value})}
+                  >
+                    <option value="">Sélectionner</option>
+                    {categories.filter(c => c !== 'all').map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="text-sm text-[var(--text-secondary)] mb-1 block">Prix d'achat (GNF) *</label>
+                  <input 
+                    type="number" 
+                    value={form.cost_price} 
+                    onChange={e => setForm({...form, cost_price: +e.target.value})} 
+                    required 
+                    placeholder="0"
+                  />
+                </div>
+                
+                <div>
+                  <label className="text-sm text-[var(--text-secondary)] mb-1 block">Prix de vente (GNF) *</label>
+                  <input 
+                    type="number" 
+                    value={form.sell_price} 
+                    onChange={e => setForm({...form, sell_price: +e.target.value})} 
+                    required 
+                    placeholder="0"
+                  />
+                </div>
+                
+                <div>
+                  <label className="text-sm text-[var(--text-secondary)] mb-1 block">Stock initial</label>
+                  <input 
+                    type="number" 
+                    value={form.stock_quantity} 
+                    onChange={e => setForm({...form, stock_quantity: +e.target.value})} 
+                    placeholder="0"
+                  />
+                </div>
+                
+                <div>
+                  <label className="text-sm text-[var(--text-secondary)] mb-1 block">Unité</label>
+                  <select 
+                    value={form.unit} 
+                    onChange={e => setForm({...form, unit: e.target.value})}
+                  >
+                    <option value="pièce">Pièce</option>
+                    <option value="kg">Kilogramme</option>
+                    <option value="litre">Litre</option>
+                    <option value="carton">Carton</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div className="flex justify-end gap-3 pt-4 border-t border-[var(--border-light)]">
+                <button type="button" onClick={() => setShowForm(false)} className="btn-ghost">
+                  Annuler
+                </button>
+                <button type="submit" className="btn-primary">
+                  {editingProduct ? 'Mettre à jour' : 'Créer le produit'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
