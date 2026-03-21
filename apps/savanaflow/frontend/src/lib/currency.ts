@@ -25,7 +25,7 @@ export const CURRENCIES: Currency[] = [
     code: 'GNF',
     name: 'Franc Guinéen',
     symbol: 'FG',
-    flag:🇬🇳',
+    flag: '🇬🇳',
     decimalPlaces: 0,
     isDefault: true
   },
