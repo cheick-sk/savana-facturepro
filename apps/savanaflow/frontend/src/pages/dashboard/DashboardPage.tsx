@@ -382,7 +382,7 @@ export default function DashboardPage() {
             </a>
           </div>
           <div className="divide-y divide-[var(--border-light)]">
-            {stats?.top_products_today?.length > 0 ? stats.top_products_today.map((product: any, i) => (
+            {(stats?.top_products_today?.length ?? 0) > 0 ? stats!.top_products_today.map((product: any, i: number) => (
               <div key={product.id || i} className="flex items-center gap-4 px-5 py-3 hover:bg-[var(--bg-secondary)] transition-colors cursor-pointer">
                 <div className="w-8 h-8 rounded-lg bg-[var(--bg-tertiary)] flex items-center justify-center text-sm font-medium text-[var(--text-secondary)]">
                   {i + 1}

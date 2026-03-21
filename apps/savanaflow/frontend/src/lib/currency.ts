@@ -1,6 +1,6 @@
 /**
  * Système Multi-Devises pour SavanaFlow
- * Devise par défaut: Franc Guinéen (GNF)
+ * Devise par defaut: Franc Guineen (GNF)
  */
 
 export interface Currency {
@@ -23,9 +23,9 @@ export interface ExchangeRate {
 export const CURRENCIES: Currency[] = [
   {
     code: 'GNF',
-    name: 'Franc Guinéen',
+    name: 'Franc Guineen',
     symbol: 'FG',
-    flag: '🇬🇳',
+    flag: 'GN',
     decimalPlaces: 0,
     isDefault: true
   },
@@ -33,89 +33,89 @@ export const CURRENCIES: Currency[] = [
     code: 'XOF',
     name: 'Franc CFA (BCEAO)',
     symbol: 'CFA',
-    flag: '🇸🇳',
+    flag: 'SN',
     decimalPlaces: 0
   },
   {
     code: 'XAF',
     name: 'Franc CFA (BEAC)',
     symbol: 'FCFA',
-    flag: '🇨🇲',
+    flag: 'CM',
     decimalPlaces: 0
   },
   {
     code: 'EUR',
     name: 'Euro',
-    symbol: '€',
-    flag: '🇪🇺',
+    symbol: '\u20AC',
+    flag: 'EU',
     decimalPlaces: 2
   },
   {
     code: 'USD',
     name: 'Dollar US',
     symbol: '$',
-    flag: '🇺🇸',
+    flag: 'US',
     decimalPlaces: 2
   },
   {
     code: 'GBP',
     name: 'Livre Sterling',
-    symbol: '£',
-    flag: '🇬🇧',
+    symbol: '\u00A3',
+    flag: 'GB',
     decimalPlaces: 2
   },
   {
     code: 'MAD',
     name: 'Dirham Marocain',
     symbol: 'DH',
-    flag: '🇲🇦',
+    flag: 'MA',
     decimalPlaces: 2
   },
   {
     code: 'DZD',
-    name: 'Dinar Algérien',
+    name: 'Dinar Algerien',
     symbol: 'DA',
-    flag: '🇩🇿',
+    flag: 'DZ',
     decimalPlaces: 2
   },
   {
     code: 'TND',
     name: 'Dinar Tunisien',
     symbol: 'DT',
-    flag: '🇹🇳',
+    flag: 'TN',
     decimalPlaces: 3
   },
   {
     code: 'GHS',
-    name: 'Cedi Ghanéen',
-    symbol: 'GH₵',
-    flag: '🇬🇭',
+    name: 'Cedi Ghaneen',
+    symbol: 'GH\u20B5',
+    flag: 'GH',
     decimalPlaces: 2
   },
   {
     code: 'NGN',
-    name: 'Naira Nigérian',
-    symbol: '₦',
-    flag: '🇳🇬',
+    name: 'Naira Nigerian',
+    symbol: '\u20A6',
+    flag: 'NG',
     decimalPlaces: 2
   },
   {
     code: 'KES',
     name: 'Shilling Kenyan',
     symbol: 'KSh',
-    flag: '🇰🇪',
+    flag: 'KE',
     decimalPlaces: 2
   },
   {
     code: 'ZAR',
     name: 'Rand Sud-Africain',
     symbol: 'R',
-    flag: '🇿🇦',
+    flag: 'ZA',
     decimalPlaces: 2
   }
 ]
 
-// Taux de change (par rapport au GNF - Franc Guinéen)
+// Taux de change (par rapport au GNF - Franc Guineen)
 export const EXCHANGE_RATES: Record<string, number> = {
   GNF: 1,           // Base
   XOF: 0.058,       // 1 GNF = 0.058 XOF
@@ -150,7 +150,7 @@ export const INVERSE_RATES: Record<string, number> = {
 }
 
 /**
- * Formate un montant dans une devise donnée
+ * Formate un montant dans une devise donnee
  */
 export function formatCurrency(
   amount: number,
@@ -160,7 +160,7 @@ export function formatCurrency(
   const currency = CURRENCIES.find(c => c.code === currencyCode) || CURRENCIES[0]
   
   if (currencyCode === 'GNF') {
-    // Format spécial pour le Franc Guinéen (pas de décimales)
+    // Format special pour le Franc Guineen (pas de decimales)
     return `${currency.symbol} ${new Intl.NumberFormat(locale).format(Math.round(amount))}`
   }
   
@@ -173,7 +173,7 @@ export function formatCurrency(
 }
 
 /**
- * Convertit un montant d'une devise à une autre
+ * Convertit un montant d'une devise a une autre
  */
 export function convertCurrency(
   amount: number,
@@ -194,7 +194,7 @@ export function convertCurrency(
 }
 
 /**
- * Obtient la devise par défaut
+ * Obtient la devise par defaut
  */
 export function getDefaultCurrency(): Currency {
   return CURRENCIES.find(c => c.isDefault) || CURRENCIES[0]
@@ -215,8 +215,22 @@ export function calculateWithTax(amount: number, taxRate: number): number {
 }
 
 /**
- * Calcule la taxe à partir du montant TTC
+ * Calcule la taxe a partir du montant TTC
  */
 export function extractTax(amountWithTax: number, taxRate: number): number {
   return amountWithTax * taxRate / (100 + taxRate)
+}
+
+/**
+ * Obtient l'emoji du drapeau a partir du code pays ISO
+ */
+export function getCountryFlag(countryCode: string): string {
+  if (!countryCode || countryCode.length !== 2) return ''
+  
+  const codePoints = countryCode
+    .toUpperCase()
+    .split('')
+    .map(char => 0x1F1E6 + char.charCodeAt(0) - 65)
+  
+  return String.fromCodePoint(...codePoints)
 }

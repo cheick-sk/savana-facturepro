@@ -159,7 +159,7 @@ export default function POSPage() {
           unitPrice: i.unit_price,
           taxRate: i.tax_rate,
           lineTotal: i.line_total,
-          barcode: i.barcode
+          barcode: i.barcode ?? undefined
         })),
         subtotal: cart.subtotal(),
         taxAmount: cart.tax(),
