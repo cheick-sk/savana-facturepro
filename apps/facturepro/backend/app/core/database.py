@@ -23,6 +23,9 @@ AsyncSessionFactory: async_sessionmaker[AsyncSession] = async_sessionmaker(
     class_=AsyncSession,
 )
 
+# Alias for backward compatibility with Celery tasks
+AsyncSessionLocal = AsyncSessionFactory
+
 
 class Base(DeclarativeBase):
     pass
