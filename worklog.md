@@ -216,3 +216,32 @@ Stage Summary:
   - apps/savanaflow/frontend/src/pages/loyalty/LoyaltyPage.tsx (import fix)
 - Tous les frontends ont maintenant un design cohérent et moderne
 - User needs to rebuild: `docker compose build --no-cache` then `docker compose up -d`
+
+---
+Task ID: 6
+Agent: Main Agent
+Task: Fix Celery Workers and Backend Container Restarts
+
+Work Log:
+- Analysé les causes des containers en restart:
+  1. Dossier `shared` non copié dans les conteneurs Docker
+  2. Imports `from shared.libs...` impossibles dans les tâches Celery
+- Modifié les Dockerfiles pour les 3 backends:
+  - Context de build étendu à la racine du projet
+  - Copie du dossier `shared` dans l'image Docker
+  - Ajout de PYTHONPATH=/app
+  - Working directory configuré correctement
+- Modifié le docker-compose.yml:
+  - Backends: context `..`, dockerfile `apps/.../Dockerfile`
+  - Workers/Beats: même configuration que les backends
+  - PYTHONPATH ajouté pour tous les services Python
+  - working_dir configuré pour chaque service
+
+Stage Summary:
+- Fichiers modifiés:
+  - apps/facturepro/backend/Dockerfile
+  - apps/savanaflow/backend/Dockerfile
+  - apps/schoolflow/backend/Dockerfile
+  - infra/docker-compose.yml
+- Le dossier `shared` est maintenant accessible dans tous les conteneurs
+- User needs to rebuild: `docker compose build --no-cache` then `docker compose up -d`
