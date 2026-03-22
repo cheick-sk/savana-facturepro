@@ -1,0 +1,22 @@
+<!-- Amount Box (for invoices, quotes, payments) -->
+{% if amount is defined %}
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 25px 0;">
+    <tr>
+        <td style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border-radius: 12px; padding: 24px; text-align: center; border: 1px solid #bbf7d0;">
+            {% if amount_label %}
+            <p style="margin: 0 0 8px 0; font-size: 14px; color: #166534; text-transform: uppercase; letter-spacing: 1px;">
+                {{ amount_label }}
+            </p>
+            {% endif %}
+            <p style="margin: 0; font-size: 32px; font-weight: 700; color: #15803d;">
+                {% if currency %}{{ currency }} {% endif %}{{ amount | default('0.00') }}
+            </p>
+            {% if amount_subtitle %}
+            <p style="margin: 8px 0 0 0; font-size: 13px; color: #166534;">
+                {{ amount_subtitle }}
+            </p>
+            {% endif %}
+        </td>
+    </tr>
+</table>
+{% endif %}

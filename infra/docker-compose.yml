@@ -1,0 +1,337 @@
+
+services:
+  # ─────────────── DATABASES ───────────────
+  postgres_facturepro:
+    image: postgres:15-alpine
+    container_name: postgres_facturepro
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: facturepro
+      POSTGRES_USER: facturepro_user
+      POSTGRES_PASSWORD: facturepro_pass
+    volumes:
+      - pg_facturepro:/var/lib/postgresql/data
+    ports:
+      - "5442:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U facturepro_user -d facturepro"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres_schoolflow:
+    image: postgres:15-alpine
+    container_name: postgres_schoolflow
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: schoolflow
+      POSTGRES_USER: schoolflow_user
+      POSTGRES_PASSWORD: schoolflow_pass
+    volumes:
+      - pg_schoolflow:/var/lib/postgresql/data
+    ports:
+      - "5443:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U schoolflow_user -d schoolflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres_savanaflow:
+    image: postgres:15-alpine
+    container_name: postgres_savanaflow
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: savanaflow
+      POSTGRES_USER: savanaflow_user
+      POSTGRES_PASSWORD: savanaflow_pass
+    volumes:
+      - pg_savanaflow:/var/lib/postgresql/data
+    ports:
+      - "5444:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U savanaflow_user -d savanaflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────── MAILHOG ───────────────
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: mailhog
+    restart: unless-stopped
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # Web UI
+    logging:
+      driver: "none"
+
+  # ─────────────── REDIS ───────────────
+  redis:
+    image: redis:7-alpine
+    container_name: redis_africa
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────── BACKENDS ───────────────
+  facturepro_backend:
+    build:
+      context: ../apps/facturepro/backend
+      dockerfile: Dockerfile
+    container_name: facturepro_backend
+    restart: unless-stopped
+    env_file:
+      - ../apps/facturepro/backend/.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://facturepro_user:facturepro_pass@postgres_facturepro:5432/facturepro
+      SMTP_HOST: mailhog
+      SMTP_PORT: "1025"
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER: redis://redis:6379/0
+    depends_on:
+      postgres_facturepro:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8001:8000"
+    volumes:
+      - facturepro_uploads:/app/uploads
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  schoolflow_backend:
+    build:
+      context: ../apps/schoolflow/backend
+      dockerfile: Dockerfile
+    container_name: schoolflow_backend
+    restart: unless-stopped
+    env_file:
+      - ../apps/schoolflow/backend/.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://schoolflow_user:schoolflow_pass@postgres_schoolflow:5432/schoolflow
+      SMTP_HOST: mailhog
+      SMTP_PORT: "1025"
+      REDIS_URL: redis://redis:6379/2
+      CELERY_BROKER: redis://redis:6379/2
+    depends_on:
+      postgres_schoolflow:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8002:8000"
+    volumes:
+      - schoolflow_uploads:/app/uploads
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  savanaflow_backend:
+    build:
+      context: ../apps/savanaflow/backend
+      dockerfile: Dockerfile
+    container_name: savanaflow_backend
+    restart: unless-stopped
+    env_file:
+      - ../apps/savanaflow/backend/.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://savanaflow_user:savanaflow_pass@postgres_savanaflow:5432/savanaflow
+      SMTP_HOST: mailhog
+      SMTP_PORT: "1025"
+      REDIS_URL: redis://redis:6379/1
+      CELERY_BROKER: redis://redis:6379/1
+    depends_on:
+      postgres_savanaflow:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8003:8000"
+    volumes:
+      - savanaflow_uploads:/app/uploads
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ─────────────── CELERY WORKERS ───────────────
+  facturepro_worker:
+    build:
+      context: ../apps/facturepro/backend
+      dockerfile: Dockerfile
+    container_name: facturepro_worker
+    restart: unless-stopped
+    env_file:
+      - ../apps/facturepro/backend/.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://facturepro_user:facturepro_pass@postgres_facturepro:5432/facturepro
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER: redis://redis:6379/0
+    command: python -m celery -A app.celery_app worker --loglevel=info --concurrency=2
+    depends_on:
+      - redis
+      - postgres_facturepro
+
+  facturepro_beat:
+    build:
+      context: ../apps/facturepro/backend
+      dockerfile: Dockerfile
+    container_name: facturepro_beat
+    restart: unless-stopped
+    env_file:
+      - ../apps/facturepro/backend/.env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER: redis://redis:6379/0
+    command: python -m celery -A app.celery_app beat --loglevel=info
+    depends_on:
+      - redis
+
+  savanaflow_worker:
+    build:
+      context: ../apps/savanaflow/backend
+      dockerfile: Dockerfile
+    container_name: savanaflow_worker
+    restart: unless-stopped
+    env_file:
+      - ../apps/savanaflow/backend/.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://savanaflow_user:savanaflow_pass@postgres_savanaflow:5432/savanaflow
+      REDIS_URL: redis://redis:6379/1
+      CELERY_BROKER: redis://redis:6379/1
+    command: python -m celery -A app.celery_app worker --loglevel=info --concurrency=2
+    depends_on:
+      - redis
+      - postgres_savanaflow
+
+  savanaflow_beat:
+    build:
+      context: ../apps/savanaflow/backend
+      dockerfile: Dockerfile
+    container_name: savanaflow_beat
+    restart: unless-stopped
+    env_file:
+      - ../apps/savanaflow/backend/.env
+    environment:
+      REDIS_URL: redis://redis:6379/1
+      CELERY_BROKER: redis://redis:6379/1
+    command: python -m celery -A app.celery_app beat --loglevel=info
+    depends_on:
+      - redis
+
+  schoolflow_worker:
+    build:
+      context: ../apps/schoolflow/backend
+      dockerfile: Dockerfile
+    container_name: schoolflow_worker
+    restart: unless-stopped
+    env_file:
+      - ../apps/schoolflow/backend/.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://schoolflow_user:schoolflow_pass@postgres_schoolflow:5432/schoolflow
+      REDIS_URL: redis://redis:6379/2
+      CELERY_BROKER: redis://redis:6379/2
+    command: python -m celery -A app.celery_app worker --loglevel=info --concurrency=2
+    depends_on:
+      - redis
+      - postgres_schoolflow
+
+  schoolflow_beat:
+    build:
+      context: ../apps/schoolflow/backend
+      dockerfile: Dockerfile
+    container_name: schoolflow_beat
+    restart: unless-stopped
+    env_file:
+      - ../apps/schoolflow/backend/.env
+    environment:
+      REDIS_URL: redis://redis:6379/2
+      CELERY_BROKER: redis://redis:6379/2
+    command: python -m celery -A app.celery_app beat --loglevel=info
+    depends_on:
+      - redis
+
+  # ─────────────── FRONTENDS ───────────────
+  facturepro_frontend:
+    build:
+      context: ../apps/facturepro/frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:8001
+    container_name: facturepro_frontend
+    restart: unless-stopped
+    ports:
+      - "3001:80"
+    depends_on:
+      - facturepro_backend
+
+  schoolflow_frontend:
+    build:
+      context: ../apps/schoolflow/frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:8002
+    container_name: schoolflow_frontend
+    restart: unless-stopped
+    ports:
+      - "3002:80"
+    depends_on:
+      - schoolflow_backend
+
+  savanaflow_frontend:
+    build:
+      context: ../apps/savanaflow/frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:8003
+    container_name: savanaflow_frontend
+    restart: unless-stopped
+    ports:
+      - "3003:80"
+    depends_on:
+      - savanaflow_backend
+
+  # ─────────────── NGINX ───────────────
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: nginx_proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - facturepro_frontend
+      - schoolflow_frontend
+      - savanaflow_frontend
+      - facturepro_backend
+      - schoolflow_backend
+      - savanaflow_backend
+
+volumes:
+  pg_facturepro:
+  pg_schoolflow:
+  pg_savanaflow:
+  facturepro_uploads:
+  schoolflow_uploads:
+  savanaflow_uploads:
+  redis_data:
+
+networks:
+  default:
+    name: africa_saas_network

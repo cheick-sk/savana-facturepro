@@ -1,0 +1,150 @@
+{% extends 'layouts/base.html' %}
+
+{% block content %}
+<!-- Welcome Header -->
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 20px;">
+    <tr>
+        <td align="center">
+            <h1 style="margin: 0; font-size: 28px; font-weight: 700; color: #111827;">
+                Welcome to {{ app_name | default('SAVANA') }}!
+            </h1>
+        </td>
+    </tr>
+</table>
+
+<!-- Greeting -->
+<p style="margin: 0 0 16px 0; font-size: 16px; color: #374151;">
+    Hello <strong>{{ user_name }}</strong>,
+</p>
+
+<!-- Main message -->
+<p style="margin: 0 0 20px 0; font-size: 15px; color: #4b5563; line-height: 1.6;">
+    We're excited to have you on board! Your account has been successfully created.
+    You can now start managing your business with our professional tools.
+</p>
+
+<!-- Features Grid -->
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 25px 0;">
+    <tr>
+        <td style="padding: 0 10px;">
+            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                    <td width="50%" valign="top" style="padding: 10px;">
+                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f0fdf4; border-radius: 8px;">
+                            <tr>
+                                <td style="padding: 16px; text-align: center;">
+                                    <span style="font-size: 32px;">📄</span>
+                                    <p style="margin: 10px 0 5px 0; font-size: 14px; font-weight: 600; color: #166534;">Invoicing</p>
+                                    <p style="margin: 0; font-size: 12px; color: #15803d;">Create and send professional invoices</p>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                    <td width="50%" valign="top" style="padding: 10px;">
+                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #eff6ff; border-radius: 8px;">
+                            <tr>
+                                <td style="padding: 16px; text-align: center;">
+                                    <span style="font-size: 32px;">👥</span>
+                                    <p style="margin: 10px 0 5px 0; font-size: 14px; font-weight: 600; color: #1e40af;">Customers</p>
+                                    <p style="margin: 0; font-size: 12px; color: #1d4ed8;">Manage your customer base</p>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+                <tr>
+                    <td width="50%" valign="top" style="padding: 10px;">
+                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #fef3c7; border-radius: 8px;">
+                            <tr>
+                                <td style="padding: 16px; text-align: center;">
+                                    <span style="font-size: 32px;">📊</span>
+                                    <p style="margin: 10px 0 5px 0; font-size: 14px; font-weight: 600; color: #92400e;">Reports</p>
+                                    <p style="margin: 0; font-size: 12px; color: #b45309;">Track your performance</p>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                    <td width="50%" valign="top" style="padding: 10px;">
+                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #fae8ff; border-radius: 8px;">
+                            <tr>
+                                <td style="padding: 16px; text-align: center;">
+                                    <span style="font-size: 32px;">💳</span>
+                                    <p style="margin: 10px 0 5px 0; font-size: 14px; font-weight: 600; color: #86198f;">Payments</p>
+                                    <p style="margin: 0; font-size: 12px; color: #a21caf;">Mobile Money & cards</p>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+</table>
+
+<!-- Verify Email Button -->
+{% if verify_url %}
+{% set info_title = 'Verify Your Email' %}
+{% set info_content = 'Please confirm your email address by clicking the button below.' %}
+{% include 'partials/info_box.html' %}
+
+{% set button_text = 'Verify Email' %}
+{% set button_url = verify_url %}
+{% include 'partials/button.html' %}
+{% else %}
+{% set button_text = 'Access My Account' %}
+{% set button_url = login_url | default('https://savana.africa/login') %}
+{% include 'partials/button.html' %}
+{% endif %}
+
+<!-- Getting Started -->
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 25px 0; background-color: #f9fafb; border-radius: 8px;">
+    <tr>
+        <td style="padding: 20px;">
+            <p style="margin: 0 0 15px 0; font-size: 15px; font-weight: 600; color: #374151;">Getting Started:</p>
+            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                    <td style="padding: 8px 0;">
+                        <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                            <tr>
+                                <td style="width: 24px; height: 24px; background-color: #1a56db; border-radius: 50%; text-align: center; font-size: 12px; font-weight: 600; color: white;">1</td>
+                                <td style="padding-left: 12px; font-size: 14px; color: #4b5563;">Complete your company profile</td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px 0;">
+                        <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                            <tr>
+                                <td style="width: 24px; height: 24px; background-color: #1a56db; border-radius: 50%; text-align: center; font-size: 12px; font-weight: 600; color: white;">2</td>
+                                <td style="padding-left: 12px; font-size: 14px; color: #4b5563;">Add your first customers</td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 8px 0;">
+                        <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                            <tr>
+                                <td style="width: 24px; height: 24px; background-color: #1a56db; border-radius: 50%; text-align: center; font-size: 12px; font-weight: 600; color: white;">3</td>
+                                <td style="padding-left: 12px; font-size: 14px; color: #4b5563;">Create and send your first invoice</td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+</table>
+
+<!-- Support -->
+<p style="margin: 20px 0 0 0; font-size: 14px; color: #6b7280; line-height: 1.6;">
+    Questions? Our support team is available at 
+    <a href="mailto:{{ support_email | default('support@savana.africa') }}" style="color: #1a56db; text-decoration: none;">{{ support_email | default('support@savana.africa') }}</a>
+</p>
+
+<p style="margin: 20px 0 0 0; font-size: 14px; color: #4b5563;">
+    Best regards,<br>
+    <strong style="color: #1a56db;">The {{ app_name | default('SAVANA') }} Team</strong>
+</p>
+{% endblock %}

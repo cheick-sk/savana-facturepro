@@ -1,0 +1,191 @@
+{
+  "info": {
+    "name": "SavanaFlow POS API",
+    "description": "Collection complète pour l'API SavanaFlow POS",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {"key": "base_url", "value": "http://localhost:8003"},
+    {"key": "token", "value": ""},
+    {"key": "refresh_token", "value": ""}
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login",
+          "event": [{"listen": "test", "script": {"exec": ["var j = pm.response.json(); pm.collectionVariables.set('token', j.access_token); pm.collectionVariables.set('refresh_token', j.refresh_token);"]}}],
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/auth/login",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\"email\": \"admin@savanaflow.africa\", \"password\": \"Admin1234!\"}"}
+          }
+        },
+        {
+          "name": "Refresh token",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/auth/refresh",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\"refresh_token\": \"{{refresh_token}}\"}"}
+          }
+        },
+        {
+          "name": "Me",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/auth/me",
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}"}]}
+          }
+        }
+      ]
+    },
+    {
+      "name": "Magasins",
+      "item": [
+        {
+          "name": "Lister les magasins",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/stores",
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}"}]}
+          }
+        },
+        {
+          "name": "Créer un magasin",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/stores",
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}"}]},
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\"name\": \"Boutique Dakar Centre\", \"address\": \"Avenue Bourguiba, Dakar\", \"phone\": \"+221 77 000 0000\"}"}
+          }
+        }
+      ]
+    },
+    {
+      "name": "Produits",
+      "item": [
+        {
+          "name": "Lister les produits",
+          "request": {
+            "method": "GET",
+            "url": {"raw": "{{base_url}}/api/v1/products?page=1&size=20", "query": [{"key": "page", "value": "1"}, {"key": "size", "value": "20"}]},
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}"}]}
+          }
+        },
+        {
+          "name": "Créer un produit",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/products",
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}"}]},
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\"store_id\": 1, \"name\": \"Riz parfumé 5kg\", \"barcode\": \"6001234567890\", \"category\": \"Alimentation\", \"unit\": \"sac\", \"sell_price\": 3500, \"cost_price\": 2800, \"tax_rate\": 0, \"stock_quantity\": 100, \"low_stock_threshold\": 10}"}
+          }
+        },
+        {
+          "name": "Lookup par code-barres",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/products/barcode/6001234567890",
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}"}]}
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ventes POS",
+      "item": [
+        {
+          "name": "Créer une vente",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/sales",
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}"}]},
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\"store_id\": 1, \"items\": [{\"product_id\": 1, \"quantity\": 2}], \"payment_method\": \"CASH\", \"currency\": \"XOF\", \"discount_amount\": 0}"}
+          }
+        },
+        {
+          "name": "Lister les ventes",
+          "request": {
+            "method": "GET",
+            "url": {"raw": "{{base_url}}/api/v1/sales?page=1&size=20", "query": [{"key": "page", "value": "1"}, {"key": "size", "value": "20"}]},
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}"}]}
+          }
+        }
+      ]
+    },
+    {
+      "name": "Stock",
+      "item": [
+        {
+          "name": "Ajustement de stock",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/stock/adjust",
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}"}]},
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {"mode": "raw", "raw": "{\"product_id\": 1, \"movement_type\": \"IN\", \"quantity\": 50, \"reason\": \"Réapprovisionnement\", \"reference\": \"BL-001\"}"}
+          }
+        },
+        {
+          "name": "Historique mouvements",
+          "request": {
+            "method": "GET",
+            "url": {"raw": "{{base_url}}/api/v1/stock/movements?size=50", "query": [{"key": "size", "value": "50"}]},
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}"}]}
+          }
+        },
+        {
+          "name": "Stocks faibles",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/stock/low",
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}"}]}
+          }
+        }
+      ]
+    },
+    {
+      "name": "Rapports",
+      "item": [
+        {
+          "name": "Rapport aujourd'hui",
+          "request": {
+            "method": "GET",
+            "url": {"raw": "{{base_url}}/api/v1/reports/sales?period=today", "query": [{"key": "period", "value": "today"}]},
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}"}]}
+          }
+        },
+        {
+          "name": "Rapport semaine",
+          "request": {
+            "method": "GET",
+            "url": {"raw": "{{base_url}}/api/v1/reports/sales?period=week", "query": [{"key": "period", "value": "week"}]},
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}"}]}
+          }
+        },
+        {
+          "name": "Rapport mensuel",
+          "request": {
+            "method": "GET",
+            "url": {"raw": "{{base_url}}/api/v1/reports/sales?period=month", "query": [{"key": "period", "value": "month"}]},
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}"}]}
+          }
+        },
+        {
+          "name": "Dashboard stats",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/dashboard/stats",
+            "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}"}]}
+          }
+        }
+      ]
+    }
+  ]
+}

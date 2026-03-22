@@ -1,0 +1,58 @@
+{
+  "expo": {
+    "name": "SavanaFlow POS",
+    "slug": "savanaflow-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1F4E79"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.savanaflow.pos",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Allow camera access to scan product barcodes",
+        "NSFaceIDUsageDescription": "Use Face ID to authenticate quickly"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1F4E79"
+      },
+      "package": "com.savanaflow.pos",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow camera access to scan product barcodes"
+        }
+      ],
+      [
+        "expo-local-authentication"
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "savanaflow-pos"
+      }
+    },
+    "owner": "savanaflow"
+  }
+}

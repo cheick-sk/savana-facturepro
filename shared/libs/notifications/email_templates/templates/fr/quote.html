@@ -1,0 +1,131 @@
+{% extends 'layouts/base.html' %}
+
+{% block content %}
+<!-- Greeting -->
+<p style="margin: 0 0 16px 0; font-size: 16px; color: #374151;">
+    Bonjour <strong>{{ customer_name }}</strong>,
+</p>
+
+<!-- Main message -->
+<p style="margin: 0 0 20px 0; font-size: 15px; color: #4b5563; line-height: 1.6;">
+    Suite à votre demande, veuillez trouver ci-joint votre devis <strong style="color: #1a56db;">{{ quote_number }}</strong>.
+    {% if expiry_date %}Ce devis est valable jusqu'au <strong>{{ expiry_date }}</strong>.{% endif %}
+</p>
+
+<!-- Amount Box -->
+{% set amount_label = 'Montant du devis' %}
+{% include 'partials/amount_box.html' %}
+
+<!-- Quote Details -->
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 20px 0; border: 1px solid #e5e7eb; border-radius: 8px;">
+    <tr style="background-color: #f9fafb;">
+        <td style="padding: 12px 20px; font-size: 13px; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb;">
+            Référence du devis
+        </td>
+    </tr>
+    <tr>
+        <td style="padding: 16px 20px;">
+            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                    <td style="padding: 6px 0; font-size: 14px; color: #6b7280;">Numéro</td>
+                    <td align="right" style="padding: 6px 0; font-size: 14px; font-weight: 600; color: #374151;">{{ quote_number }}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 6px 0; font-size: 14px; color: #6b7280;">Date</td>
+                    <td align="right" style="padding: 6px 0; font-size: 14px; color: #374151;">{{ quote_date }}</td>
+                </tr>
+                {% if expiry_date %}
+                <tr>
+                    <td style="padding: 6px 0; font-size: 14px; color: #6b7280;">Validité</td>
+                    <td align="right" style="padding: 6px 0; font-size: 14px; color: #374151;">jusqu'au {{ expiry_date }}</td>
+                </tr>
+                {% endif %}
+            </table>
+        </td>
+    </tr>
+</table>
+
+<!-- Items -->
+{% if items %}
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 20px 0; border: 1px solid #e5e7eb; border-radius: 8px;">
+    <tr style="background-color: #f9fafb;">
+        <td style="padding: 12px 20px; font-size: 13px; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb;">
+            Détail des prestations
+        </td>
+    </tr>
+    <tr>
+        <td style="padding: 16px 20px;">
+            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <thead>
+                    <tr>
+                        <td style="padding: 6px 0; font-size: 12px; color: #6b7280; text-transform: uppercase; border-bottom: 1px solid #e5e7eb;">Description</td>
+                        <td align="center" style="padding: 6px 0; font-size: 12px; color: #6b7280; text-transform: uppercase; border-bottom: 1px solid #e5e7eb;">Qté</td>
+                        <td align="right" style="padding: 6px 0; font-size: 12px; color: #6b7280; text-transform: uppercase; border-bottom: 1px solid #e5e7eb;">Prix unitaire</td>
+                        <td align="right" style="padding: 6px 0; font-size: 12px; color: #6b7280; text-transform: uppercase; border-bottom: 1px solid #e5e7eb;">Total</td>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr>
+                        <td style="padding: 10px 0; font-size: 14px; color: #374151;">{{ item.description }}</td>
+                        <td align="center" style="padding: 10px 0; font-size: 14px; color: #374151;">{{ item.quantity }}</td>
+                        <td align="right" style="padding: 10px 0; font-size: 14px; color: #374151;">{{ item.unit_price }} {{ currency }}</td>
+                        <td align="right" style="padding: 10px 0; font-size: 14px; font-weight: 600; color: #374151;">{{ item.total }} {{ currency }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </td>
+    </tr>
+</table>
+{% endif %}
+
+<!-- Action Buttons -->
+{% if accept_url %}
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 25px 0;">
+    <tr>
+        <td align="center">
+            <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                    <td style="padding-right: 10px;">
+                        <a href="{{ accept_url }}" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #1a56db 0%, #3b82f6 100%); color: #ffffff; font-size: 14px; font-weight: 600; text-decoration: none; padding: 12px 24px; border-radius: 8px;">
+                            Accepter le devis
+                        </a>
+                    </td>
+                    {% if reject_url %}
+                    <td>
+                        <a href="{{ reject_url }}" target="_blank" style="display: inline-block; background: #ffffff; color: #6b7280; font-size: 14px; font-weight: 600; text-decoration: none; padding: 12px 24px; border-radius: 8px; border: 1px solid #d1d5db;">
+                            Refuser
+                        </a>
+                    </td>
+                    {% endif %}
+                </tr>
+            </table>
+        </td>
+    </tr>
+</table>
+{% endif %}
+
+<!-- Notes -->
+{% if notes %}
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 20px 0; background-color: #f9fafb; border-radius: 8px;">
+    <tr>
+        <td style="padding: 16px 20px;">
+            <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: #374151;">Notes</p>
+            <p style="margin: 0; font-size: 14px; color: #6b7280; line-height: 1.6;">{{ notes }}</p>
+        </td>
+    </tr>
+</table>
+{% endif %}
+
+<!-- Contact -->
+<p style="margin: 25px 0 0 0; font-size: 14px; color: #6b7280; line-height: 1.6;">
+    Pour toute question concernant ce devis, contactez-nous à 
+    <a href="mailto:{{ support_email | default('support@savana.africa') }}" style="color: #1a56db; text-decoration: none;">{{ support_email | default('support@savana.africa') }}</a>.
+</p>
+
+<p style="margin: 20px 0 0 0; font-size: 14px; color: #4b5563;">
+    Dans l'attente de votre retour,<br>
+    <strong style="color: #1a56db;">{{ company_name | default('Notre équipe') }}</strong>
+</p>
+{% endblock %}
