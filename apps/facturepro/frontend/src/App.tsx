@@ -19,10 +19,39 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   const init = useAuthStore(s => s.init)
-  useEffect(() => { init() }, [init])
+
+  useEffect(() => {
+    init()
+  }, [init])
+
   return (
     <BrowserRouter>
-      <Toaster position="top-right" />
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: 'var(--bg-primary)',
+            color: 'var(--text-primary)',
+            border: '1px solid var(--border-light)',
+            borderRadius: '10px',
+            padding: '12px 16px',
+            fontSize: '14px'
+          },
+          success: {
+            iconTheme: {
+              primary: '#22c55e',
+              secondary: '#fff'
+            }
+          },
+          error: {
+            iconTheme: {
+              primary: '#ef4444',
+              secondary: '#fff'
+            }
+          }
+        }}
+      />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/" element={<RequireAuth><Layout /></RequireAuth>}>
@@ -33,9 +62,49 @@ export default function App() {
           <Route path="invoices/:id" element={<InvoiceDetailPage />} />
           <Route path="products" element={<ProductsPage />} />
           <Route path="payments" element={<PaymentsPage />} />
+          {/* Placeholder routes for navigation items */}
+          <Route path="quotes" element={<ComingSoonPage title="Devis" />} />
+          <Route path="expenses" element={<ComingSoonPage title="Dépenses" />} />
+          <Route path="reports" element={<ComingSoonPage title="Rapports" />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
+  )
+}
+
+// Placeholder for pages not yet implemented
+function ComingSoonPage({ title }: { title: string }) {
+  return (
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: 400,
+      textAlign: 'center'
+    }}>
+      <div style={{
+        fontSize: 48,
+        marginBottom: 16,
+        opacity: 0.3
+      }}>
+        🚧
+      </div>
+      <h2 style={{
+        fontSize: 24,
+        fontWeight: 600,
+        marginBottom: 8,
+        color: 'var(--text-primary)'
+      }}>
+        {title}
+      </h2>
+      <p style={{
+        color: 'var(--text-secondary)',
+        maxWidth: 400
+      }}>
+        Cette fonctionnalité sera bientôt disponible. Nous travaillons activement pour vous offrir une expérience complète.
+      </p>
+    </div>
   )
 }
