@@ -8,6 +8,17 @@ import enTranslation from './locales/en.json';
 import woTranslation from './locales/wo.json';  // Wolof (Senegal)
 import swTranslation from './locales/sw.json';  // Swahili (East Africa)
 
+// Clean corrupted localStorage values before i18n init
+const LANG_KEY = 'savanaflow-lang';
+try {
+  const langValue = localStorage.getItem(LANG_KEY);
+  if (langValue === 'undefined' || langValue === 'null' || langValue === '') {
+    localStorage.removeItem(LANG_KEY);
+  }
+} catch {
+  // Ignore errors
+}
+
 // Available languages
 export const resources = {
   fr: { translation: frTranslation },
