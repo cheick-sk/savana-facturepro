@@ -1,10 +1,18 @@
 import { useEffect, useState, useRef } from 'react'
-import { Search, Trash2, Plus, Minus, CreditCard, Smartphone, Banknote, Check } from 'lucide-react'
+import { Search, Trash2, Plus, Minus, CreditCard, Smartphone, Banknote, Check, Package, Barcode, Store } from 'lucide-react'
 import api from '../../lib/api'
 import { useCartStore } from '../../store/cart'
+import { Button } from '../../components/ui/Button'
+import { Input } from '../../components/ui/Input'
+import { Card, CardContent, CardHeader } from '../../components/ui/Card'
+import { Badge } from '../../components/ui/Badge'
 import toast from 'react-hot-toast'
+import { motion, AnimatePresence } from 'framer-motion'
 
-const fmt = (n: number) => new Intl.NumberFormat('fr-FR').format(Math.round(n * 100) / 100)
+const formatCurrency = (n: number) =>
+  new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XOF', maximumFractionDigits: 0 }).format(n)
+
+const formatNumber = (n: number) => new Intl.NumberFormat('fr-FR').format(Math.round(n * 100) / 100)
 
 export default function POSPage() {
   const [products, setProducts] = useState<any[]>([])
@@ -21,7 +29,10 @@ export default function POSPage() {
   useEffect(() => {
     api.get('/stores').then(r => {
       setStores(r.data)
-      if (r.data.length > 0) { setSelectedStore(r.data[0].id); cart.setStore(r.data[0].id) }
+      if (r.data.length > 0) {
+        setSelectedStore(r.data[0].id)
+        cart.setStore(r.data[0].id)
+      }
     })
   }, [])
 
@@ -38,12 +49,21 @@ export default function POSPage() {
       cart.addItem(data)
       setSearch('')
       if (barcodeRef.current) barcodeRef.current.value = ''
-    } catch { toast.error(`Produit introuvable: ${code}`) }
+      toast.success(`${data.name} ajouté au panier`)
+    } catch {
+      toast.error(`Produit introuable: ${code}`)
+    }
   }
 
   const processSale = async () => {
-    if (cart.items.length === 0) { toast.error('Panier vide'); return }
-    if (!selectedStore) { toast.error('Sélectionnez un magasin'); return }
+    if (cart.items.length === 0) {
+      toast.error('Panier vide')
+      return
+    }
+    if (!selectedStore) {
+      toast.error('Sélectionnez un magasin')
+      return
+    }
     setProcessing(true)
     try {
       const { data } = await api.post('/sales', {
@@ -59,162 +79,275 @@ export default function POSPage() {
       toast.success(`Vente ${data.sale_number} enregistrée !`)
     } catch (err: any) {
       toast.error(err?.response?.data?.detail || 'Erreur lors de la vente')
-    } finally { setProcessing(false) }
+    } finally {
+      setProcessing(false)
+    }
   }
 
   const totalWithDiscount = Math.max(0, cart.total() - discount)
 
+  const paymentMethods = [
+    { key: 'CASH', icon: Banknote, label: 'Espèces', color: 'from-green-500 to-green-600' },
+    { key: 'MOBILE_MONEY', icon: Smartphone, label: 'Mobile', color: 'from-blue-500 to-blue-600' },
+    { key: 'CARD', icon: CreditCard, label: 'Carte', color: 'from-purple-500 to-purple-600' },
+  ] as const
+
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 16, height: 'calc(100vh - 96px)' }}>
+    <div className="h-[calc(100vh-120px)] flex flex-col lg:flex-row gap-4">
       {/* LEFT: Product catalog */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div style={{ display: 'flex', gap: 10 }}>
+      <div className="flex-1 flex flex-col gap-4 overflow-hidden">
+        {/* Search Bar */}
+        <div className="flex flex-col sm:flex-row gap-3">
           {/* Store selector */}
-          <select value={selectedStore || ''} onChange={e => { const v = +e.target.value; setSelectedStore(v); cart.setStore(v) }} style={{ minWidth: 160 }}>
-            {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-          </select>
+          <div className="relative">
+            <Store className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <select
+              value={selectedStore || ''}
+              onChange={e => {
+                const v = +e.target.value
+                setSelectedStore(v)
+                cart.setStore(v)
+              }}
+              className="pl-10 pr-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm font-medium text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-secondary-500/50 min-w-[180px]"
+            >
+              {stores.map(s => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          </div>
+
           {/* Search / Barcode */}
-          <div style={{ flex: 1, position: 'relative' }}>
-            <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-secondary)' }} />
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
               ref={barcodeRef}
-              placeholder="Rechercher ou scanner code-barres..."
+              placeholder="Rechercher un produit ou scanner un code-barres..."
               onChange={e => setSearch(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') lookupBarcode((e.target as HTMLInputElement).value) }}
-              style={{ paddingLeft: 32, width: '100%', boxSizing: 'border-box' }}
+              onKeyDown={e => {
+                if (e.key === 'Enter') lookupBarcode((e.target as HTMLInputElement).value)
+              }}
+              className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-secondary-500/50"
             />
           </div>
         </div>
 
         {/* Products grid */}
-        <div style={{ flex: 1, overflow: 'auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 8, alignContent: 'start' }}>
-          {products.map(p => (
-            <button key={p.id} onClick={() => cart.addItem(p)} style={{
-              background: 'var(--color-background-primary)',
-              border: `0.5px solid ${p.is_low_stock ? 'var(--color-border-warning)' : 'var(--color-border-tertiary)'}`,
-              borderRadius: 'var(--border-radius-md)',
-              padding: '12px', textAlign: 'left', cursor: 'pointer',
-              transition: 'background .15s',
-            }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-background-secondary)')}
-              onMouseLeave={e => (e.currentTarget.style.background = 'var(--color-background-primary)')}
-            >
-              <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-primary)', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</div>
-              {p.category && <div style={{ fontSize: 10, color: 'var(--color-text-secondary)', marginBottom: 4 }}>{p.category}</div>}
-              <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>{fmt(p.sell_price)} XOF</div>
-              <div style={{ fontSize: 10, color: p.is_low_stock ? 'var(--color-text-warning)' : 'var(--color-text-secondary)', marginTop: 2 }}>
-                Stock: {fmt(p.stock_quantity)} {p.unit}
-              </div>
-            </button>
-          ))}
+        <div className="flex-1 overflow-y-auto scrollbar-thin">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            <AnimatePresence mode="popLayout">
+              {products.map((p, index) => (
+                <motion.button
+                  key={p.id}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  transition={{ delay: index * 0.02 }}
+                  onClick={() => cart.addItem(p)}
+                  className={`relative bg-white dark:bg-gray-800 rounded-xl p-3 text-left transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 border ${
+                    p.is_low_stock
+                      ? 'border-amber-300 dark:border-amber-700'
+                      : 'border-gray-100 dark:border-gray-700'
+                  }`}
+                >
+                  {p.is_low_stock && (
+                    <div className="absolute top-2 right-2">
+                      <Badge variant="warning" size="sm">Stock bas</Badge>
+                    </div>
+                  )}
+                  <div className="aspect-square rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 flex items-center justify-center mb-3">
+                    <Package className="w-8 h-8 text-gray-300 dark:text-gray-600" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                      {p.name}
+                    </p>
+                    {p.category && (
+                      <p className="text-xs text-gray-500 dark:text-gray-400">{p.category}</p>
+                    )}
+                    <p className="text-base font-bold text-secondary-600 dark:text-secondary-400">
+                      {formatCurrency(p.sell_price)}
+                    </p>
+                    <p className={`text-xs ${p.is_low_stock ? 'text-amber-600' : 'text-gray-400'}`}>
+                      Stock: {formatNumber(p.stock_quantity)} {p.unit}
+                    </p>
+                  </div>
+                </motion.button>
+              ))}
+            </AnimatePresence>
+          </div>
+
           {products.length === 0 && (
-            <div style={{ gridColumn: '1/-1', padding: 40, textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: 13 }}>
-              Aucun produit trouvé
+            <div className="flex flex-col items-center justify-center h-full text-gray-400">
+              <Barcode className="w-16 h-16 mb-4 opacity-30" />
+              <p className="text-lg font-medium">Aucun produit trouvé</p>
+              <p className="text-sm">Essayez de modifier votre recherche</p>
             </div>
           )}
         </div>
       </div>
 
       {/* RIGHT: Cart + Checkout */}
-      <div style={{ display: 'flex', flexDirection: 'column', background: 'var(--color-background-primary)', border: '0.5px solid var(--color-border-tertiary)', borderRadius: 'var(--border-radius-lg)', overflow: 'hidden' }}>
-        <div style={{ padding: '14px 16px', borderBottom: '0.5px solid var(--color-border-tertiary)', fontWeight: 500, fontSize: 14 }}>
-          Panier ({cart.items.length} article{cart.items.length !== 1 ? 's' : ''})
-        </div>
+      <Card className="w-full lg:w-[380px] flex flex-col overflow-hidden shadow-xl">
+        {/* Cart Header */}
+        <CardHeader className="bg-gradient-to-r from-secondary-500 to-green-600 text-white">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold">
+              Panier
+            </h2>
+            <Badge variant="default" className="bg-white/20 text-white">
+              {cart.items.length} article{cart.items.length !== 1 ? 's' : ''}
+            </Badge>
+          </div>
+        </CardHeader>
 
         {/* Cart items */}
-        <div style={{ flex: 1, overflow: 'auto', padding: '8px 0' }}>
+        <div className="flex-1 overflow-y-auto scrollbar-thin">
           {cart.items.length === 0 ? (
-            <div style={{ padding: 32, textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: 13 }}>
-              Scannez ou cliquez sur un produit
+            <div className="flex flex-col items-center justify-center h-full text-gray-400 p-8">
+              <Package className="w-12 h-12 mb-3 opacity-30" />
+              <p className="text-sm">Scannez ou cliquez sur un produit</p>
             </div>
-          ) : cart.items.map(item => (
-            <div key={item.product_id} style={{ padding: '8px 14px', borderBottom: '0.5px solid var(--color-border-tertiary)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
-                <span style={{ fontSize: 12, fontWeight: 500, flex: 1, paddingRight: 8 }}>{item.name}</span>
-                <button onClick={() => cart.removeItem(item.product_id)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--color-text-secondary)', padding: 2 }}>
-                  <Trash2 size={12} />
-                </button>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <button onClick={() => cart.updateQty(item.product_id, item.quantity - 1)} style={{ border: '0.5px solid var(--color-border-secondary)', background: 'none', cursor: 'pointer', borderRadius: 4, width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Minus size={10} />
-                  </button>
-                  <span style={{ fontSize: 13, minWidth: 24, textAlign: 'center' }}>{item.quantity}</span>
-                  <button onClick={() => cart.updateQty(item.product_id, item.quantity + 1)} style={{ border: '0.5px solid var(--color-border-secondary)', background: 'none', cursor: 'pointer', borderRadius: 4, width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Plus size={10} />
-                  </button>
-                </div>
-                <span style={{ fontSize: 13, fontWeight: 500 }}>{fmt(item.line_total)} XOF</span>
-              </div>
+          ) : (
+            <div className="divide-y divide-gray-100 dark:divide-gray-800">
+              <AnimatePresence mode="popLayout">
+                {cart.items.map(item => (
+                  <motion.div
+                    key={item.product_id}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    className="p-4"
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="text-sm font-medium text-gray-900 dark:text-white flex-1 pr-2">
+                        {item.name}
+                      </span>
+                      <button
+                        onClick={() => cart.removeItem(item.product_id)}
+                        className="p-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-400 hover:text-red-500 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => cart.updateQty(item.product_id, item.quantity - 1)}
+                          className="w-7 h-7 rounded-lg border border-gray-200 dark:border-gray-700 flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        >
+                          <Minus className="w-3 h-3" />
+                        </button>
+                        <span className="text-sm font-medium w-8 text-center">{item.quantity}</span>
+                        <button
+                          onClick={() => cart.updateQty(item.product_id, item.quantity + 1)}
+                          className="w-7 h-7 rounded-lg border border-gray-200 dark:border-gray-700 flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        >
+                          <Plus className="w-3 h-3" />
+                        </button>
+                      </div>
+                      <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                        {formatCurrency(item.line_total)}
+                      </span>
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             </div>
-          ))}
+          )}
         </div>
 
         {/* Totals */}
-        <div style={{ padding: '12px 16px', borderTop: '0.5px solid var(--color-border-tertiary)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 4 }}>
-            <span>Sous-total</span><span>{fmt(cart.subtotal())} XOF</span>
+        <div className="border-t border-gray-100 dark:border-gray-800 p-4 space-y-2 bg-gray-50/50 dark:bg-gray-900/50">
+          <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400">
+            <span>Sous-total</span>
+            <span>{formatCurrency(cart.subtotal())}</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 4 }}>
-            <span>TVA</span><span>{fmt(cart.tax())} XOF</span>
+          <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400">
+            <span>TVA (18%)</span>
+            <span>{formatCurrency(cart.tax())}</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-            <label style={{ fontSize: 12, color: 'var(--color-text-secondary)', whiteSpace: 'nowrap' }}>Remise</label>
-            <input type="number" min="0" value={discount} onChange={e => setDiscount(+e.target.value)} style={{ width: 80 }} />
+          <div className="flex items-center gap-3 py-2">
+            <label className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">Remise</label>
+            <input
+              type="number"
+              min="0"
+              value={discount}
+              onChange={e => setDiscount(+e.target.value)}
+              className="flex-1 px-3 py-1.5 text-sm bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-secondary-500/50"
+            />
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 500, paddingTop: 8, borderTop: '0.5px solid var(--color-border-tertiary)' }}>
-            <span>Total</span><span>{fmt(totalWithDiscount)} XOF</span>
+          <div className="flex justify-between text-lg font-bold text-gray-900 dark:text-white pt-2 border-t border-gray-200 dark:border-gray-700">
+            <span>Total</span>
+            <span className="text-secondary-600 dark:text-secondary-400">{formatCurrency(totalWithDiscount)}</span>
           </div>
         </div>
 
         {/* Payment method */}
-        <div style={{ padding: '0 16px 12px' }}>
-          <div style={{ fontSize: 11, color: 'var(--color-text-secondary)', marginBottom: 6 }}>Mode de paiement</div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            {[
-              { key: 'CASH', icon: Banknote, label: 'Espèces' },
-              { key: 'MOBILE_MONEY', icon: Smartphone, label: 'Mobile' },
-              { key: 'CARD', icon: CreditCard, label: 'Carte' },
-            ].map(({ key, icon: Icon, label }) => (
-              <button key={key} onClick={() => setPaymentMethod(key as any)} style={{
-                flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-                padding: '8px 4px', borderRadius: 'var(--border-radius-md)',
-                border: paymentMethod === key ? '1.5px solid var(--color-border-info)' : '0.5px solid var(--color-border-secondary)',
-                background: paymentMethod === key ? 'var(--color-background-info)' : 'none',
-                cursor: 'pointer', fontSize: 10, color: paymentMethod === key ? 'var(--color-text-info)' : 'var(--color-text-secondary)',
-              }}>
-                <Icon size={14} />{label}
+        <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-800">
+          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Mode de paiement</p>
+          <div className="grid grid-cols-3 gap-2">
+            {paymentMethods.map(({ key, icon: Icon, label, color }) => (
+              <button
+                key={key}
+                onClick={() => setPaymentMethod(key)}
+                className={`flex flex-col items-center gap-1.5 p-2.5 rounded-xl border-2 transition-all ${
+                  paymentMethod === key
+                    ? `border-transparent bg-gradient-to-br ${color} text-white`
+                    : 'border-gray-200 dark:border-gray-700 text-gray-500 hover:border-secondary-300'
+                }`}
+              >
+                <Icon className="w-5 h-5" />
+                <span className="text-xs font-medium">{label}</span>
               </button>
             ))}
           </div>
         </div>
 
         {/* Submit */}
-        <div style={{ padding: '0 16px 16px' }}>
-          <button onClick={processSale} disabled={processing || cart.items.length === 0} style={{
-            width: '100%', padding: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-            fontSize: 14, fontWeight: 500, cursor: 'pointer',
-            background: cart.items.length === 0 ? 'var(--color-background-secondary)' : 'var(--color-background-primary)',
-          }}>
-            <Check size={16} />
-            {processing ? 'Traitement...' : `Encaisser ${fmt(totalWithDiscount)} XOF`}
-          </button>
+        <div className="p-4 space-y-2">
+          <Button
+            onClick={processSale}
+            disabled={processing || cart.items.length === 0}
+            className="w-full"
+            size="lg"
+            variant={cart.items.length === 0 ? 'ghost' : 'secondary'}
+          >
+            <Check className="w-5 h-5" />
+            {processing ? 'Traitement...' : `Encaisser ${formatCurrency(totalWithDiscount)}`}
+          </Button>
           {cart.items.length > 0 && (
-            <button onClick={() => { cart.clear(); setDiscount(0) }} style={{ width: '100%', marginTop: 6, padding: '8px', fontSize: 12, color: 'var(--color-text-secondary)', background: 'none', border: 'none', cursor: 'pointer' }}>
+            <button
+              onClick={() => {
+                cart.clear()
+                setDiscount(0)
+              }}
+              className="w-full py-2 text-sm text-gray-500 hover:text-red-500 transition-colors"
+            >
               Vider le panier
             </button>
           )}
         </div>
 
         {/* Last sale confirmation */}
-        {lastSale && (
-          <div style={{ margin: '0 16px 16px', padding: '10px 12px', background: 'var(--color-background-success)', borderRadius: 'var(--border-radius-md)', border: '0.5px solid var(--color-border-success)' }}>
-            <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--color-text-success)' }}>Vente enregistrée</div>
-            <div style={{ fontSize: 11, color: 'var(--color-text-success)' }}>{lastSale.sale_number} — {fmt(lastSale.total_amount)} XOF</div>
-          </div>
-        )}
-      </div>
+        <AnimatePresence>
+          {lastSale && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              className="mx-4 mb-4 p-3 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800"
+            >
+              <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                <Check className="w-4 h-4" />
+                <span className="text-sm font-medium">Vente enregistrée</span>
+              </div>
+              <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                {lastSale.sale_number} — {formatCurrency(lastSale.total_amount)}
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </Card>
     </div>
   )
 }
