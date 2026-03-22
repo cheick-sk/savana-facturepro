@@ -85,11 +85,13 @@ def upgrade() -> None:
         "invoices",
         ["organisation_id", "due_date"],
     )
+    # Index for overdue invoices - filter by status only (date filtering done in query)
+    # Note: CURRENT_DATE cannot be used in index predicate as it's not IMMUTABLE
     op.create_index(
         "ix_invoices_overdue",
         "invoices",
-        ["organisation_id", "status", "due_date"],
-        postgresql_where=sa.text("status IN ('SENT', 'PARTIAL') AND due_date < CURRENT_DATE"),
+        ["organisation_id", "due_date", "status"],
+        postgresql_where=sa.text("status IN ('SENT', 'PARTIAL')"),
     )
 
     # Invoice items index

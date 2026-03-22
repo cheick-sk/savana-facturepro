@@ -17,3 +17,7 @@ pytest==8.2.0
 pytest-asyncio==0.23.6
 pytest-cov==5.0.0
 ruff==0.4.4
+
+# Async task queue
+celery[redis]==5.4.0
+redis>=4.5.2,<5.0.0
