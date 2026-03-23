@@ -7,6 +7,7 @@ import frTranslation from './locales/fr.json';
 import enTranslation from './locales/en.json';
 import woTranslation from './locales/wo.json';  // Wolof (Senegal)
 import swTranslation from './locales/sw.json';  // Swahili (East Africa)
+import susTranslation from './locales/sus.json';  // Soussou (Guinea)
 
 // Clean corrupted localStorage values before i18n init
 const LANG_KEYS = ['i18nextLng', 'facturepro-lang'];
@@ -27,6 +28,7 @@ export const resources = {
   en: { translation: enTranslation },
   wo: { translation: woTranslation },
   sw: { translation: swTranslation },
+  sus: { translation: susTranslation },
 } as const;
 
 // Supported languages with metadata
@@ -36,7 +38,7 @@ export const supportedLanguages = [
     name: 'Français', 
     nativeName: 'Français',
     flag: '🇫🇷',
-    countries: ['CI', 'SN', 'BF', 'ML', 'BJ', 'TG', 'NE', 'CM', 'GA', 'CG'],
+    countries: ['CI', 'SN', 'BF', 'ML', 'BJ', 'TG', 'NE', 'CM', 'GA', 'CG', 'GN'],
     default: true 
   },
   { 
@@ -44,7 +46,7 @@ export const supportedLanguages = [
     name: 'English', 
     nativeName: 'English',
     flag: '🇬🇧',
-    countries: ['NG', 'GH', 'KE', 'TZ', 'UG', 'RW', 'ZA'],
+    countries: ['NG', 'GH', 'KE', 'TZ', 'UG', 'RW', 'ZA', 'GM', 'SL', 'LR'],
     default: false 
   },
   { 
@@ -61,6 +63,14 @@ export const supportedLanguages = [
     nativeName: 'Kiswahili',
     flag: '🇰🇪',
     countries: ['KE', 'TZ', 'UG', 'RW', 'CD', 'MZ'],
+    default: false 
+  },
+  { 
+    code: 'sus', 
+    name: 'Soussou', 
+    nativeName: 'Sosoxui',
+    flag: '🇬🇳',
+    countries: ['GN'],
     default: false 
   },
 ];
@@ -95,7 +105,7 @@ i18n
     load: 'languageOnly',
     
     // Whitelist only supported languages
-    supportedLngs: ['fr', 'en', 'wo', 'sw'],
+    supportedLngs: ['fr', 'en', 'wo', 'sw', 'sus'],
     
     // Non-explicit whitelist - allow only supported languages
     nonExplicitSupportedLngs: true,
@@ -122,6 +132,7 @@ export function formatCurrency(amount: number, currency: string = 'XOF'): string
   const currencyLocales: Record<string, string> = {
     XOF: 'fr-SN',
     XAF: 'fr-CM',
+    GNF: 'fr-GN',
     NGN: 'en-NG',
     GHS: 'en-GH',
     KES: 'sw-KE',
@@ -132,12 +143,13 @@ export function formatCurrency(amount: number, currency: string = 'XOF'): string
     MAD: 'fr-MA',
     TND: 'ar-TN',
     ETB: 'am-ET',
+    EGP: 'ar-EG',
   };
   
   const locale = currencyLocales[currency] || currentLang;
   
   // Use simple formatting for African currencies that don't have proper locale support
-  if (['XOF', 'XAF'].includes(currency)) {
+  if (['XOF', 'XAF', 'GNF'].includes(currency)) {
     return new Intl.NumberFormat('fr-FR', {
       style: 'decimal',
       minimumFractionDigits: 0,
@@ -177,6 +189,7 @@ export function formatDate(date: string | Date, options?: Intl.DateTimeFormatOpt
     en: 'en-GB',
     wo: 'fr-SN',
     sw: 'sw-KE',
+    sus: 'fr-GN',
   };
   
   const locale = localeMap[currentLang] || 'fr-FR';
@@ -204,6 +217,7 @@ export function formatNumber(value: number, decimals: number = 0): string {
     en: 'en-GB',
     wo: 'fr-SN',
     sw: 'sw-KE',
+    sus: 'fr-GN',
   };
   
   const locale = localeMap[currentLang] || 'fr-FR';
