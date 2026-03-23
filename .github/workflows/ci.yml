@@ -1,0 +1,300 @@
+name: Africa SaaS CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  PYTHON_VERSION: '3.11'
+  NODE_VERSION: '20'
+
+jobs:
+  # ───────────────────────────────────────────────────────────────────────────
+  # BACKEND TESTS
+  # ───────────────────────────────────────────────────────────────────────────
+  backend-tests:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: test_db
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_pass
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r apps/facturepro/backend/requirements.txt
+          pip install pytest pytest-asyncio pytest-cov httpx aiohttp
+      
+      - name: Run FacturePro tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://test_user:test_pass@localhost:5432/test_db
+          REDIS_URL: redis://localhost:6379/0
+          SECRET_KEY: test-secret-key-for-ci
+        run: |
+          cd apps/facturepro/backend
+          pytest tests/ -v --cov=app --cov-report=xml
+      
+      - name: Run SavanaFlow tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://test_user:test_pass@localhost:5432/test_db
+          REDIS_URL: redis://localhost:6379/1
+          SECRET_KEY: test-secret-key-for-ci
+        run: |
+          cd apps/savanaflow/backend
+          pytest tests/ -v
+      
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./apps/facturepro/backend/coverage.xml
+          fail_ci_if_error: false
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # FRONTEND TESTS
+  # ───────────────────────────────────────────────────────────────────────────
+  frontend-tests:
+    name: Frontend Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: apps/facturepro/frontend/package-lock.json
+      
+      - name: Install FacturePro dependencies
+        run: |
+          cd apps/facturepro/frontend
+          npm ci
+      
+      - name: Run FacturePro lint
+        run: |
+          cd apps/facturepro/frontend
+          npm run lint || true
+      
+      - name: Build FacturePro
+        run: |
+          cd apps/facturepro/frontend
+          npm run build
+      
+      - name: Install SavanaFlow dependencies
+        run: |
+          cd apps/savanaflow/frontend
+          npm ci
+      
+      - name: Build SavanaFlow
+        run: |
+          cd apps/savanaflow/frontend
+          npm run build
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # SECURITY SCAN
+  # ───────────────────────────────────────────────────────────────────────────
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'table'
+          exit-code: '0'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'
+      
+      - name: Run Bandit (Python security)
+        run: |
+          pip install bandit
+          bandit -r apps/ -f json -o bandit-report.json || true
+      
+      - name: Upload security report
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-report
+          path: bandit-report.json
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # DOCKER BUILD
+  # ───────────────────────────────────────────────────────────────────────────
+  docker-build:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    needs: [backend-tests, frontend-tests]
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+        if: github.event_name != 'pull_request'
+      
+      - name: Build FacturePro Backend
+        uses: docker/build-push-action@v5
+        with:
+          context: apps/facturepro/backend
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ secrets.DOCKER_USERNAME }}/facturepro-backend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Build FacturePro Frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: apps/facturepro/frontend
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ secrets.DOCKER_USERNAME }}/facturepro-frontend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Build SavanaFlow Backend
+        uses: docker/build-push-action@v5
+        with:
+          context: apps/savanaflow/backend
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ secrets.DOCKER_USERNAME }}/savanaflow-backend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      - name: Build SavanaFlow Frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: apps/savanaflow/frontend
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ secrets.DOCKER_USERNAME }}/savanaflow-frontend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # DEPLOY TO STAGING
+  # ───────────────────────────────────────────────────────────────────────────
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [docker-build]
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Deploy to staging server
+        run: |
+          echo "Deploying to staging environment..."
+          # Add your deployment script here
+          # Example: SSH to server and run docker-compose pull && docker-compose up -d
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # DEPLOY TO PRODUCTION
+  # ───────────────────────────────────────────────────────────────────────────
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [docker-build]
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Deploy to production server
+        run: |
+          echo "Deploying to production environment..."
+          # Add your deployment script here
+          # Example: SSH to server and run docker-compose pull && docker-compose up -d
+      
+      - name: Notify Sentry of deployment
+        run: |
+          curl -sL https://sentry.io/api/hooks/release/ \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -d '{"version": "${{ github.sha }}", "environment": "production"}'
+        env:
+          SENTRY_WEBHOOK: ${{ secrets.SENTRY_WEBHOOK }}
+        if: always()
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # CODE QUALITY
+  # ───────────────────────────────────────────────────────────────────────────
+  code-quality:
+    name: Code Quality Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install linters
+        run: |
+          pip install black isort flake8 mypy
+      
+      - name: Run Black (code formatting)
+        run: |
+          black --check apps/ shared/ || true
+      
+      - name: Run isort (import sorting)
+        run: |
+          isort --check-only apps/ shared/ || true
+      
+      - name: Run Flake8 (linting)
+        run: |
+          flake8 apps/ shared/ --max-line-length=100 --ignore=E501,W503 || true

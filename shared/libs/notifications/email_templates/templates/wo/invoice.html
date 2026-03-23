@@ -1,0 +1,61 @@
+{% extends 'layouts/base.html' %}
+
+{% block content %}
+<!-- Greeting -->
+<p style="margin: 0 0 16px 0; font-size: 16px; color: #374151;">
+    Jaaraama <strong>{{ customer_name }}</strong>,
+</p>
+
+<!-- Main message -->
+<p style="margin: 0 0 20px 0; font-size: 15px; color: #4b5563; line-height: 1.6;">
+    Soo Faynde sa sak-sak bu <strong style="color: #1a56db;">{{ invoice_number }}</strong>
+    {% if due_date %} ba ëppëf <strong>{{ due_date }}</strong>{% endif %}.
+</p>
+
+<!-- Amount Box -->
+{% set amount_label = 'Nafay' %}
+{% include 'partials/amount_box.html' %}
+
+<!-- Invoice Details -->
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 20px 0; border: 1px solid #e5e7eb; border-radius: 8px;">
+    <tr>
+        <td style="padding: 16px 20px; border-bottom: 1px solid #e5e7eb;">
+            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                    <td style="font-size: 14px; color: #6b7280;">Numéro bu sak-sak</td>
+                    <td align="right" style="font-size: 14px; font-weight: 600; color: #374151;">{{ invoice_number }}</td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+    {% if due_date %}
+    <tr>
+        <td style="padding: 12px 20px;">
+            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                    <td style="font-size: 14px; color: #6b7280;">Ba ëppëf</td>
+                    <td align="right" style="font-size: 14px; color: #374151;">{{ due_date }}</td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+    {% endif %}
+</table>
+
+<!-- Payment Button -->
+{% if payment_link %}
+{% set button_text = 'Fay leegi' %}
+{% set button_url = payment_link %}
+{% include 'partials/button.html' %}
+{% endif %}
+
+<!-- Support info -->
+<p style="margin: 25px 0 0 0; font-size: 14px; color: #6b7280; line-height: 1.6;">
+    Bu amee laaj, nanga duggante nu ci 
+    <a href="mailto:{{ support_email | default('support@savana.africa') }}" style="color: #1a56db; text-decoration: none;">{{ support_email | default('support@savana.africa') }}</a>.
+</p>
+
+<p style="margin: 20px 0 0 0; font-size: 14px; color: #4b5563;">
+    Jërënjëf!
+</p>
+{% endblock %}

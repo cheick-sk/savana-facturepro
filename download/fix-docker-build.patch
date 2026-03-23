@@ -1,0 +1,276 @@
+From 09776eda84d83244e520f6732eedf3f7b754df3d Mon Sep 17 00:00:00 2001
+From: Z User <z@container>
+Date: Mon, 16 Mar 2026 18:38:26 +0000
+Subject: [PATCH] fix: resolve Docker build issues
+
+- Add missing i18n dependencies (i18next, react-i18next, i18next-browser-languagedetector)
+- Fix TypeScript error in i18n/index.ts (err parameter type)
+- Fix redis version conflict with celery (redis>=4.5.2,<5.0.0)
+- Remove unused tailwindcss/postcss/autoprefixer dependencies
+- Fix TypeScript error in savanaflow offline-db.ts (index name mismatch)
+- Add .gitignore to exclude node_modules
+---
+ .gitignore                                    | 88 +++++++++++++++++++
+ apps/facturepro/backend/requirements.txt      |  2 +-
+ apps/facturepro/frontend/package.json         | 10 +--
+ apps/facturepro/frontend/src/i18n/index.ts    |  2 +-
+ .../frontend/src/pages/auth/LoginPage.tsx     | 40 +++++++--
+ apps/savanaflow/frontend/package.json         |  3 -
+ .../savanaflow/frontend/src/lib/offline-db.ts |  2 +-
+ apps/schoolflow/frontend/package.json         |  5 +-
+ 8 files changed, 131 insertions(+), 21 deletions(-)
+ create mode 100644 .gitignore
+
+diff --git a/.gitignore b/.gitignore
+new file mode 100644
+index 0000000..255edbe
+--- /dev/null
++++ b/.gitignore
+@@ -0,0 +1,88 @@
++# Python
++__pycache__/
++*.py[cod]
++*$py.class
++*.so
++.Python
++build/
++develop-eggs/
++dist/
++downloads/
++eggs/
++.eggs/
++lib/
++lib64/
++parts/
++sdist/
++var/
++wheels/
++*.egg-info/
++.installed.cfg
++*.egg
++.env
++.venv
++env/
++venv/
++ENV/
++env.bak/
++venv.bak/
++!**/src/lib/
++
++# Node
++node_modules/
++npm-debug.log*
++yarn-debug.log*
++yarn-error.log*
++.pnpm-debug.log*
++
++# Build outputs
++dist/
++build/
++*.local
++
++# IDE
++.idea/
++.vscode/
++*.swp
++*.swo
++*~
++
++# OS
++.DS_Store
++.DS_Store?
++._*
++.Spotlight-V100
++.Trashes
++ehthumbs.db
++Thumbs.db
++
++# Testing
++.coverage
++htmlcov/
++.tox/
++.nox/
++.coverage.*
++.cache
++nosetests.xml
++coverage.xml
++*.cover
++*.py,cover
++.hypothesis/
++.pytest_cache/
++pytestdebug.log
++
++# Logs
++logs/
++*.log
++
++# Database
++*.db
++*.sqlite3
++
++# Uploads
++uploads/
++
++# Misc
++*.bak
++*.tmp
++*.temp
+diff --git a/apps/facturepro/backend/requirements.txt b/apps/facturepro/backend/requirements.txt
+index 3659da3..499cbed 100755
+--- a/apps/facturepro/backend/requirements.txt
++++ b/apps/facturepro/backend/requirements.txt
+@@ -22,7 +22,7 @@ qrcode[pil]==7.4.2
+ 
+ # Async task queue
+ celery[redis]==5.4.0
+-redis==5.0.1
++redis>=4.5.2,<5.0.0
+ 
+ # Two-Factor Authentication
+ pyotp==2.9.0
+diff --git a/apps/facturepro/frontend/package.json b/apps/facturepro/frontend/package.json
+index 5889684..3c18ca4 100755
+--- a/apps/facturepro/frontend/package.json
++++ b/apps/facturepro/frontend/package.json
+@@ -17,16 +17,16 @@
+     "react-hot-toast": "^2.4.1",
+     "lucide-react": "^0.383.0",
+     "recharts": "^2.12.7",
+-    "clsx": "^2.1.1"
++    "clsx": "^2.1.1",
++    "i18next": "^23.11.5",
++    "react-i18next": "^14.1.2",
++    "i18next-browser-languagedetector": "^8.0.0"
+   },
+   "devDependencies": {
+     "@types/react": "^18.3.3",
+     "@types/react-dom": "^18.3.0",
+     "@vitejs/plugin-react": "^4.3.0",
+     "typescript": "^5.4.5",
+-    "vite": "^5.2.13",
+-    "tailwindcss": "^3.4.4",
+-    "autoprefixer": "^10.4.19",
+-    "postcss": "^8.4.38"
++    "vite": "^5.2.13"
+   }
+ }
+diff --git a/apps/facturepro/frontend/src/i18n/index.ts b/apps/facturepro/frontend/src/i18n/index.ts
+index 7af52e0..3e838a5 100755
+--- a/apps/facturepro/frontend/src/i18n/index.ts
++++ b/apps/facturepro/frontend/src/i18n/index.ts
+@@ -209,7 +209,7 @@ export function t(key: string, options?: Record<string, any>): string {
+ // Change language and persist
+ export function changeLanguage(languageCode: string): Promise<void> {
+   return new Promise((resolve, reject) => {
+-    i18n.changeLanguage(languageCode, (err) => {
++    i18n.changeLanguage(languageCode, (err: Error | null | undefined) => {
+       if (err) {
+         reject(err);
+       } else {
+diff --git a/apps/facturepro/frontend/src/pages/auth/LoginPage.tsx b/apps/facturepro/frontend/src/pages/auth/LoginPage.tsx
+index 81713e1..e4ca08e 100755
+--- a/apps/facturepro/frontend/src/pages/auth/LoginPage.tsx
++++ b/apps/facturepro/frontend/src/pages/auth/LoginPage.tsx
+@@ -8,11 +8,17 @@ export default function LoginPage() {
+   const [password, setPassword] = useState('Admin1234!')
+   const { login, loading } = useAuthStore()
+   const navigate = useNavigate()
++
+   const submit = async (e: FormEvent) => {
+     e.preventDefault()
+-    try { await login(email, password); navigate('/dashboard') }
+-    catch { toast.error('Identifiants invalides') }
++    try {
++      await login(email, password)
++      navigate('/dashboard')
++    } catch {
++      toast.error('Identifiants invalides')
++    }
+   }
++
+   return (
+     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-background-tertiary)' }}>
+       <div style={{ width: 380, background: 'var(--color-background-primary)', borderRadius: 'var(--border-radius-lg)', border: '0.5px solid var(--color-border-tertiary)', padding: '32px 28px' }}>
+@@ -21,11 +27,33 @@ export default function LoginPage() {
+           <div style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>Connectez-vous</div>
+         </div>
+         <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+-          <div><label style={{ fontSize: 12, display: 'block', marginBottom: 6, color: 'var(--color-text-secondary)' }}>Email</label><input type="email" value={email} onChange={e => setEmail(e.target.value)} required style={{ width: '100%', boxSizing: 'border-box' }} /></div>
+-          <div><label style={{ fontSize: 12, display: 'block', marginBottom: 6, color: 'var(--color-text-secondary)' }}>Mot de passe</label><input type="password" value={password} onChange={e => setPassword(e.target.value)} required style={{ width: '100%', boxSizing: 'border-box' }} /></div>
+-          <button type="submit" disabled={loading} style={{ marginTop: 8, padding: '10px' }}>{loading ? 'Connexion...' : 'Se connecter'}</button>
++          <div>
++            <label style={{ fontSize: 12, display: 'block', marginBottom: 6, color: 'var(--color-text-secondary)' }}>Email</label>
++            <input
++              type="email"
++              value={email}
++              onChange={e => setEmail(e.target.value)}
++              required
++              style={{ width: '100%', boxSizing: 'border-box' }}
++            />
++          </div>
++          <div>
++            <label style={{ fontSize: 12, display: 'block', marginBottom: 6, color: 'var(--color-text-secondary)' }}>Mot de passe</label>
++            <input
++              type="password"
++              value={password}
++              onChange={e => setPassword(e.target.value)}
++              required
++              style={{ width: '100%', boxSizing: 'border-box' }}
++            />
++          </div>
++          <button type="submit" disabled={loading} style={{ marginTop: 8, padding: '10px' }}>
++            {loading ? 'Connexion...' : 'Se connecter'}
++          </button>
+         </form>
+-        <div style={{ marginTop: 14, padding: '10px 12px', background: 'var(--color-background-secondary)', borderRadius: 'var(--border-radius-md)', fontSize: 11, color: 'var(--color-text-secondary)' }}>Demo: admin@facturepro.africa / Admin1234!</div>
++        <div style={{ marginTop: 14, padding: '10px 12px', background: 'var(--color-background-secondary)', borderRadius: 'var(--border-radius-md)', fontSize: 11, color: 'var(--color-text-secondary)' }}>
++          Demo: admin@facturepro.africa / Admin1234!
++        </div>
+       </div>
+     </div>
+   )
+diff --git a/apps/savanaflow/frontend/package.json b/apps/savanaflow/frontend/package.json
+index adbaf31..a49cd05 100755
+--- a/apps/savanaflow/frontend/package.json
++++ b/apps/savanaflow/frontend/package.json
+@@ -24,9 +24,6 @@
+     "@types/react": "^18.3.3",
+     "@types/react-dom": "^18.3.0",
+     "@vitejs/plugin-react": "^4.3.0",
+-    "autoprefixer": "^10.4.19",
+-    "postcss": "^8.4.38",
+-    "tailwindcss": "^3.4.4",
+     "typescript": "^5.4.5",
+     "vite": "^5.2.13"
+   }
+diff --git a/apps/savanaflow/frontend/src/lib/offline-db.ts b/apps/savanaflow/frontend/src/lib/offline-db.ts
+index 34dbdd3..344aa3c 100755
+--- a/apps/savanaflow/frontend/src/lib/offline-db.ts
++++ b/apps/savanaflow/frontend/src/lib/offline-db.ts
+@@ -21,7 +21,7 @@ interface SavanaFlowDB extends DBSchema {
+       category_id: number | null;
+       syncedAt: Date;
+     };
+-    indexes: { 'by-barcode': string };
++    indexes: { 'barcode': string };
+   };
+   customers: {
+     key: number;
+diff --git a/apps/schoolflow/frontend/package.json b/apps/schoolflow/frontend/package.json
+index ca7a37f..351b0b9 100755
+--- a/apps/schoolflow/frontend/package.json
++++ b/apps/schoolflow/frontend/package.json
+@@ -24,9 +24,6 @@
+     "@types/react-dom": "^18.3.0",
+     "@vitejs/plugin-react": "^4.3.0",
+     "typescript": "^5.4.5",
+-    "vite": "^5.2.13",
+-    "tailwindcss": "^3.4.4",
+-    "autoprefixer": "^10.4.19",
+-    "postcss": "^8.4.38"
++    "vite": "^5.2.13"
+   }
+ }
+-- 
+2.47.3
+

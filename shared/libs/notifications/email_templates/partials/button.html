@@ -1,0 +1,18 @@
+<!-- Primary Button -->
+{% if button_url and button_text %}
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 20px 0;">
+    <tr>
+        <td align="{{ button_align | default('center') }}">
+            <a href="{{ button_url }}" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #1a56db 0%, #3b82f6 100%); color: #ffffff; font-size: 16px; font-weight: 600; text-decoration: none; padding: 14px 32px; border-radius: 8px; box-shadow: 0 4px 14px rgba(26, 86, 219, 0.3);">
+                <!--[if mso]>
+                <span style="padding: 14px 32px; display: inline-block;">
+                <![endif]-->
+                {{ button_text }}
+                <!--[if mso]>
+                </span>
+                <![endif]-->
+            </a>
+        </td>
+    </tr>
+</table>
+{% endif %}
