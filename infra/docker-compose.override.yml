@@ -5,39 +5,88 @@
 # ═══════════════════════════════════════════════════════════════════════════════
 
 services:
-  # Override nginx to use development config (no SSL)
+  # ─────────────── DATABASES - Expose ports for local dev ───────────────
+  postgres_facturepro:
+    ports:
+      - "5432:5432"
+
+  postgres_savanaflow:
+    ports:
+      - "5433:5432"
+
+  # ─────────────── REDIS - Expose port for local dev ───────────────
+  redis:
+    ports:
+      - "6379:6379"
+
+  # ─────────────── NGINX - Development config (no SSL) ───────────────
   nginx:
     volumes:
       - ./nginx/nginx.dev.conf:/etc/nginx/nginx.conf:ro
     ports:
       - "80:80"
-    # Don't expose 443 in development
-    expose:
-      - "80"
+      - "443:443"
 
-  # Disable certbot in development
+  # ─────────────── DISABLE CERTBOT IN DEV ───────────────
   certbot:
     deploy:
       replicas: 0
 
-  # Enable mailhog for email testing
+  # ─────────────── MAILHOG - Email testing ───────────────
   mailhog:
     profiles: []
     ports:
-      - "1025:1025"
-      - "8025:8025"
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # Web UI
 
-  # Frontend build args for local development
+  # ─────────────── BACKENDS - Expose ports for local dev ───────────────
+  facturepro_backend:
+    ports:
+      - "8001:8000"
+    build:
+      context: ..
+      dockerfile: apps/facturepro/backend/Dockerfile
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_FP_USER:-facturepro_user}:${POSTGRES_FP_PASSWORD}@postgres_facturepro:5432/${POSTGRES_FP_DB:-facturepro}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      CELERY_BROKER: redis://:${REDIS_PASSWORD}@redis:6379/0
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-in-production}
+      SMTP_HOST: ${SMTP_HOST:-mailhog}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      ENVIRONMENT: development
+      PYTHONPATH: /app
+
+  savanaflow_backend:
+    ports:
+      - "8002:8000"
+    build:
+      context: ..
+      dockerfile: apps/savanaflow/backend/Dockerfile
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_SF_USER:-savanaflow_user}:${POSTGRES_SF_PASSWORD}@postgres_savanaflow:5432/${POSTGRES_SF_DB:-savanaflow}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/1
+      CELERY_BROKER: redis://:${REDIS_PASSWORD}@redis:6379/1
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-in-production}
+      SMTP_HOST: ${SMTP_HOST:-mailhog}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      ENVIRONMENT: development
+      PYTHONPATH: /app
+
+  # ─────────────── FRONTENDS - Expose ports for local dev ───────────────
   facturepro_frontend:
+    ports:
+      - "3001:80"
     build:
       context: ../apps/facturepro/frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: http://localhost
+        VITE_API_URL: http://localhost:8001
 
   savanaflow_frontend:
+    ports:
+      - "3002:80"
     build:
       context: ../apps/savanaflow/frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: http://localhost:3002
+        VITE_API_URL: http://localhost:8002

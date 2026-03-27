@@ -115,12 +115,7 @@ def upgrade() -> None:
         ["payment_link_token"],
         unique=True,
     )
-    op.create_index(
-        "ix_invoices_number",
-        "invoices",
-        ["invoice_number"],
-        unique=True,
-    )
+    # Note: ix_invoices_number already created in 0001_initial.py
 
     # Invoice items index
     op.create_index(
@@ -225,8 +220,8 @@ def downgrade() -> None:
     op.drop_index("ix_payments_method", "payments")
     op.drop_index("ix_payments_invoice_date", "payments")
     op.drop_index("ix_invoice_items_invoice_product", "invoice_items")
-    op.drop_index("ix_invoices_number", "invoices")
     op.drop_index("ix_invoices_payment_link", "invoices")
+    # Note: ix_invoices_number dropped automatically when invoices table is dropped
     op.drop_index("ix_invoices_overdue", "invoices")
     op.drop_index("ix_invoices_org_due_date", "invoices")
     op.drop_index("ix_invoices_org_customer", "invoices")

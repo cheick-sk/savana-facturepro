@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.celery_app import celery_app
 from app.core.database import AsyncSessionLocal
 from app.models.all_models import Invoice, RecurringInvoice, Organisation, User, InvoiceItem
-from app.services import invoice_service
+from app.services.invoice_service import generate_invoice_from_recurring, generate_and_store_pdf
 from app.services.pdf_service import generate_invoice_pdf
 
 
@@ -47,7 +47,7 @@ async def _process_recurring_invoices_async():
         for recurring in recurring_invoices:
             try:
                 # Generate new invoice from template
-                invoice = await invoice_service.generate_invoice_from_recurring(db, recurring)
+                invoice = await generate_invoice_from_recurring(db, recurring)
 
                 # Update recurring invoice
                 recurring.last_run = now
@@ -204,7 +204,7 @@ async def _generate_invoice_pdf_async(invoice_id: int):
 
         # Generate PDF using the service function
         try:
-            pdf_path = await invoice_service.generate_and_store_pdf(db, invoice)
+            pdf_path = await generate_and_store_pdf(db, invoice)
             await db.commit()
 
             return {

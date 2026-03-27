@@ -23,5 +23,8 @@ WORKDIR /app/apps/facturepro/backend
 # Set PYTHONPATH to include shared
 ENV PYTHONPATH=/app
 
+# Expose the application port
+EXPOSE 8000
+
 # Run migrations then start server
 CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2"]
