@@ -8,16 +8,16 @@ services:
   # ─────────────── DATABASES - Expose ports for local dev ───────────────
   postgres_facturepro:
     ports:
-      - "5432:5432"
+      - "15432:5432"
 
   postgres_savanaflow:
     ports:
-      - "5433:5432"
+      - "15433:5432"
 
   # ─────────────── REDIS - Expose port for local dev ───────────────
   redis:
     ports:
-      - "6379:6379"
+      - "16379:6379"
 
   # ─────────────── NGINX - Development config (no SSL) ───────────────
   nginx:
