@@ -1,8 +1,12 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# SavanaFlow Backend Dockerfile - Production Ready
+# ═══════════════════════════════════════════════════════════════════════════════
+
 FROM python:3.11-slim
 
 WORKDIR /app
 
-# System deps for reportlab/asyncpg + netcat for db wait
+# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc libpq-dev curl netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*
@@ -26,7 +30,7 @@ ENV PYTHONPATH=/app
 # Expose the application port
 EXPOSE 8000
 
-# Copy and set up entrypoint script
+# Copy entrypoint script
 COPY apps/savanaflow/backend/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
