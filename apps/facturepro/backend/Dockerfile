@@ -2,9 +2,9 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# System deps for reportlab/asyncpg
+# System deps for reportlab/asyncpg + netcat for db wait
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc libpq-dev curl \
+    gcc libpq-dev curl netcat-openbsd \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
@@ -26,5 +26,9 @@ ENV PYTHONPATH=/app
 # Expose the application port
 EXPOSE 8000
 
-# Run migrations, seed data, then start server
-CMD ["sh", "-c", "alembic upgrade head && python -m app.seeders && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2"]
+# Copy and set up entrypoint script
+COPY apps/facturepro/backend/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Use entrypoint script
+ENTRYPOINT ["/entrypoint.sh"]
