@@ -63,8 +63,6 @@ export default {
         display: ['Poppins', 'Inter', 'sans-serif'],
       },
       boxShadow: {
-        'card': '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)',
-        'card-hover': '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
         'glow': '0 0 20px rgba(249, 115, 22, 0.3)',
         'glow-green': '0 0 20px rgba(34, 197, 94, 0.3)',
       },
