@@ -5,6 +5,8 @@ Creates optimized indexes for high-performance queries:
 - Invoice searches by status and date
 - Product searches by SKU/barcode
 - Payment queries by invoice
+
+Note: is_active columns are added in migration 0005_soft_delete
 """
 from alembic import op
 import sqlalchemy as sa
@@ -19,13 +21,12 @@ depends_on = None
 def upgrade() -> None:
     """Add performance indexes."""
 
-    # Organisation indexes
+    # Organisation indexes - simple unique index on lowercase slug
     op.create_index(
         "ix_organisations_slug_lower",
         "organisations",
         [sa.text("lower(slug)")],
         unique=True,
-        postgresql_where=sa.text("is_active = true"),
     )
 
     # User indexes
@@ -41,10 +42,9 @@ def upgrade() -> None:
         ["organisation_id", "role"],
     )
     op.create_index(
-        "ix_users_active",
+        "ix_users_organisation",
         "users",
-        ["is_active", "organisation_id"],
-        postgresql_where=sa.text("is_active = true"),
+        ["organisation_id"],
     )
 
     # Customer indexes
@@ -54,10 +54,9 @@ def upgrade() -> None:
         ["organisation_id", "name"],
     )
     op.create_index(
-        "ix_customers_active_org",
+        "ix_customers_organisation",
         "customers",
-        ["organisation_id", "is_active"],
-        postgresql_where=sa.text("is_active = true"),
+        ["organisation_id"],
     )
     op.create_index(
         "ix_customers_email_lower",
@@ -72,10 +71,9 @@ def upgrade() -> None:
         ["organisation_id", "category_id"],
     )
     op.create_index(
-        "ix_products_active_org",
+        "ix_products_organisation",
         "products",
-        ["organisation_id", "is_active"],
-        postgresql_where=sa.text("is_active = true"),
+        ["organisation_id"],
     )
     op.create_index(
         "ix_products_sku_lower",
@@ -106,20 +104,22 @@ def upgrade() -> None:
         "invoices",
         ["organisation_id", "due_date"],
     )
-    # Index for overdue invoices - filter by status only (date filtering done in query)
-    # Note: CURRENT_DATE cannot be used in index predicate as it's not IMMUTABLE
     op.create_index(
         "ix_invoices_overdue",
         "invoices",
         ["organisation_id", "due_date", "status"],
-        postgresql_where=sa.text("status IN ('SENT', 'PARTIAL')"),
     )
     op.create_index(
         "ix_invoices_payment_link",
         "invoices",
         ["payment_link_token"],
         unique=True,
-        postgresql_where=sa.text("payment_link_token IS NOT NULL"),
+    )
+    op.create_index(
+        "ix_invoices_number",
+        "invoices",
+        ["invoice_number"],
+        unique=True,
     )
 
     # Invoice items index
@@ -140,6 +140,11 @@ def upgrade() -> None:
         "payments",
         ["method", "paid_at"],
     )
+    op.create_index(
+        "ix_payments_organisation",
+        "payments",
+        ["organisation_id"],
+    )
 
     # Quote indexes
     op.create_index(
@@ -151,7 +156,12 @@ def upgrade() -> None:
         "ix_quotes_expiry",
         "quotes",
         ["organisation_id", "expiry_date"],
-        postgresql_where=sa.text("status = 'SENT'"),
+    )
+    op.create_index(
+        "ix_quotes_number",
+        "quotes",
+        ["quote_number"],
+        unique=True,
     )
 
     # Expense indexes
@@ -208,11 +218,14 @@ def downgrade() -> None:
     op.drop_index("ix_audit_logs_org_date", "audit_logs")
     op.drop_index("ix_expenses_org_category", "expenses")
     op.drop_index("ix_expenses_org_date", "expenses")
+    op.drop_index("ix_quotes_number", "quotes")
     op.drop_index("ix_quotes_expiry", "quotes")
     op.drop_index("ix_quotes_org_status", "quotes")
+    op.drop_index("ix_payments_organisation", "payments")
     op.drop_index("ix_payments_method", "payments")
     op.drop_index("ix_payments_invoice_date", "payments")
     op.drop_index("ix_invoice_items_invoice_product", "invoice_items")
+    op.drop_index("ix_invoices_number", "invoices")
     op.drop_index("ix_invoices_payment_link", "invoices")
     op.drop_index("ix_invoices_overdue", "invoices")
     op.drop_index("ix_invoices_org_due_date", "invoices")
@@ -220,12 +233,12 @@ def downgrade() -> None:
     op.drop_index("ix_invoices_org_status_date", "invoices")
     op.drop_index("ix_products_barcode_lower", "products")
     op.drop_index("ix_products_sku_lower", "products")
-    op.drop_index("ix_products_active_org", "products")
+    op.drop_index("ix_products_organisation", "products")
     op.drop_index("ix_products_org_category", "products")
     op.drop_index("ix_customers_email_lower", "customers")
-    op.drop_index("ix_customers_active_org", "customers")
+    op.drop_index("ix_customers_organisation", "customers")
     op.drop_index("ix_customers_search", "customers")
-    op.drop_index("ix_users_active", "users")
+    op.drop_index("ix_users_organisation", "users")
     op.drop_index("ix_users_organisation_role", "users")
     op.drop_index("ix_users_email_lower", "users")
     op.drop_index("ix_organisations_slug_lower", "organisations")

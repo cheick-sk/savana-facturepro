@@ -1,0 +1,43 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# DOCKER COMPOSE OVERRIDE - LOCAL DEVELOPMENT
+# This file overrides settings for local development
+# Usage: docker compose up -d (automatically loads docker-compose.override.yml)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+services:
+  # Override nginx to use development config (no SSL)
+  nginx:
+    volumes:
+      - ./nginx/nginx.dev.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "80:80"
+    # Don't expose 443 in development
+    expose:
+      - "80"
+
+  # Disable certbot in development
+  certbot:
+    deploy:
+      replicas: 0
+
+  # Enable mailhog for email testing
+  mailhog:
+    profiles: []
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+  # Frontend build args for local development
+  facturepro_frontend:
+    build:
+      context: ../apps/facturepro/frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost
+
+  savanaflow_frontend:
+    build:
+      context: ../apps/savanaflow/frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:3002
