@@ -7,9 +7,7 @@ describe('Cart Store - SavanaFlow POS', () => {
     // Reset cart before each test
     useCartStore.setState({
       items: [],
-      customer: null,
-      discount: 0,
-      paymentMethod: 'cash',
+      storeId: null,
     })
     vi.clearAllMocks()
   })
@@ -19,9 +17,42 @@ describe('Cart Store - SavanaFlow POS', () => {
       const state = useCartStore.getState()
 
       expect(state.items).toEqual([])
-      expect(state.customer).toBeNull()
-      expect(state.discount).toBe(0)
-      expect(state.paymentMethod).toBe('cash')
+      expect(state.storeId).toBeNull()
+    })
+  })
+
+  describe('Store Management', () => {
+    it('should set store ID', () => {
+      const { result } = renderHook(() => useCartStore())
+
+      act(() => {
+        result.current.setStore(1)
+      })
+
+      expect(result.current.storeId).toBe(1)
+    })
+
+    it('should clear items when store changes', () => {
+      const { result } = renderHook(() => useCartStore())
+
+      // Add an item first
+      act(() => {
+        result.current.addItem({
+          id: 1,
+          name: 'Product 1',
+          sell_price: 5000,
+          tax_rate: 0,
+        })
+      })
+      expect(result.current.items).toHaveLength(1)
+
+      // Change store - should clear items
+      act(() => {
+        result.current.setStore(2)
+      })
+
+      expect(result.current.items).toHaveLength(0)
+      expect(result.current.storeId).toBe(2)
     })
   })
 
@@ -31,9 +62,9 @@ describe('Cart Store - SavanaFlow POS', () => {
       const product = {
         id: 1,
         name: 'Product 1',
-        price: 5000,
-        quantity: 1,
+        sell_price: 5000,
         barcode: '123456789',
+        tax_rate: 0,
       }
 
       act(() => {
@@ -42,6 +73,7 @@ describe('Cart Store - SavanaFlow POS', () => {
 
       expect(result.current.items).toHaveLength(1)
       expect(result.current.items[0].name).toBe('Product 1')
+      expect(result.current.items[0].unit_price).toBe(5000)
     })
 
     it('should increase quantity when adding existing product', () => {
@@ -49,9 +81,9 @@ describe('Cart Store - SavanaFlow POS', () => {
       const product = {
         id: 1,
         name: 'Product 1',
-        price: 5000,
-        quantity: 1,
+        sell_price: 5000,
         barcode: '123456789',
+        tax_rate: 0,
       }
 
       act(() => {
@@ -67,11 +99,21 @@ describe('Cart Store - SavanaFlow POS', () => {
       const { result } = renderHook(() => useCartStore())
 
       act(() => {
-        result.current.addItem({ id: 1, name: 'Product 1', price: 5000, quantity: 1 })
-        result.current.addItem({ id: 2, name: 'Product 2', price: 10000, quantity: 1 })
+        result.current.addItem({ id: 1, name: 'Product 1', sell_price: 5000, tax_rate: 0 })
+        result.current.addItem({ id: 2, name: 'Product 2', sell_price: 10000, tax_rate: 0 })
       })
 
       expect(result.current.items).toHaveLength(2)
+    })
+
+    it('should calculate line total correctly', () => {
+      const { result } = renderHook(() => useCartStore())
+
+      act(() => {
+        result.current.addItem({ id: 1, name: 'Product 1', sell_price: 5000, tax_rate: 0 }, 2)
+      })
+
+      expect(result.current.items[0].line_total).toBe(10000)
     })
   })
 
@@ -80,7 +122,7 @@ describe('Cart Store - SavanaFlow POS', () => {
       const { result } = renderHook(() => useCartStore())
 
       act(() => {
-        result.current.addItem({ id: 1, name: 'Product 1', price: 5000, quantity: 1 })
+        result.current.addItem({ id: 1, name: 'Product 1', sell_price: 5000, tax_rate: 0 })
       })
       expect(result.current.items).toHaveLength(1)
 
@@ -94,7 +136,7 @@ describe('Cart Store - SavanaFlow POS', () => {
       const { result } = renderHook(() => useCartStore())
 
       act(() => {
-        result.current.addItem({ id: 1, name: 'Product 1', price: 5000, quantity: 1 })
+        result.current.addItem({ id: 1, name: 'Product 1', sell_price: 5000, tax_rate: 0 })
         result.current.removeItem(999)
       })
 
@@ -107,11 +149,11 @@ describe('Cart Store - SavanaFlow POS', () => {
       const { result } = renderHook(() => useCartStore())
 
       act(() => {
-        result.current.addItem({ id: 1, name: 'Product 1', price: 5000, quantity: 1 })
+        result.current.addItem({ id: 1, name: 'Product 1', sell_price: 5000, tax_rate: 0 })
       })
 
       act(() => {
-        result.current.updateQuantity(1, 5)
+        result.current.updateQty(1, 5)
       })
 
       expect(result.current.items[0].quantity).toBe(5)
@@ -121,11 +163,25 @@ describe('Cart Store - SavanaFlow POS', () => {
       const { result } = renderHook(() => useCartStore())
 
       act(() => {
-        result.current.addItem({ id: 1, name: 'Product 1', price: 5000, quantity: 1 })
+        result.current.addItem({ id: 1, name: 'Product 1', sell_price: 5000, tax_rate: 0 })
       })
 
       act(() => {
-        result.current.updateQuantity(1, 0)
+        result.current.updateQty(1, 0)
+      })
+
+      expect(result.current.items).toHaveLength(0)
+    })
+
+    it('should remove item when quantity is negative', () => {
+      const { result } = renderHook(() => useCartStore())
+
+      act(() => {
+        result.current.addItem({ id: 1, name: 'Product 1', sell_price: 5000, tax_rate: 0 })
+      })
+
+      act(() => {
+        result.current.updateQty(1, -1)
       })
 
       expect(result.current.items).toHaveLength(0)
@@ -137,82 +193,34 @@ describe('Cart Store - SavanaFlow POS', () => {
       const { result } = renderHook(() => useCartStore())
 
       act(() => {
-        result.current.addItem({ id: 1, name: 'Product 1', price: 5000, quantity: 2 })
-        result.current.addItem({ id: 2, name: 'Product 2', price: 10000, quantity: 1 })
+        result.current.addItem({ id: 1, name: 'Product 1', sell_price: 5000, tax_rate: 0 }, 2)
+        result.current.addItem({ id: 2, name: 'Product 2', sell_price: 10000, tax_rate: 0 }, 1)
       })
 
-      const subtotal = result.current.getSubtotal()
+      const subtotal = result.current.subtotal()
       expect(subtotal).toBe(20000) // (5000 * 2) + (10000 * 1)
     })
 
-    it('should calculate total with discount', () => {
+    it('should calculate tax correctly', () => {
       const { result } = renderHook(() => useCartStore())
 
       act(() => {
-        result.current.addItem({ id: 1, name: 'Product 1', price: 10000, quantity: 1 })
-        result.current.setDiscount(10) // 10% discount
+        result.current.addItem({ id: 1, name: 'Product 1', sell_price: 10000, tax_rate: 18 })
       })
 
-      const total = result.current.getTotal()
-      expect(total).toBe(9000) // 10000 - 10%
-    })
-  })
-
-  describe('Customer', () => {
-    it('should set customer', () => {
-      const { result } = renderHook(() => useCartStore())
-      const customer = {
-        id: 1,
-        name: 'Customer Name',
-        phone: '+224 123 456 789',
-        loyalty_points: 100,
-      }
-
-      act(() => {
-        result.current.setCustomer(customer)
-      })
-
-      expect(result.current.customer).toEqual(customer)
+      const tax = result.current.tax()
+      expect(tax).toBe(1800) // 10000 * 18%
     })
 
-    it('should clear customer', () => {
+    it('should calculate total correctly', () => {
       const { result } = renderHook(() => useCartStore())
 
       act(() => {
-        result.current.setCustomer({ id: 1, name: 'Customer', phone: '+224', loyalty_points: 0 })
+        result.current.addItem({ id: 1, name: 'Product 1', sell_price: 10000, tax_rate: 18 })
       })
 
-      act(() => {
-        result.current.clearCustomer()
-      })
-
-      expect(result.current.customer).toBeNull()
-    })
-  })
-
-  describe('Payment Method', () => {
-    it('should set payment method', () => {
-      const { result } = renderHook(() => useCartStore())
-
-      act(() => {
-        result.current.setPaymentMethod('orange_money')
-      })
-
-      expect(result.current.paymentMethod).toBe('orange_money')
-    })
-
-    it('should support all payment methods', () => {
-      const paymentMethods = ['cash', 'orange_money', 'mtn_momo', 'wave', 'celtis_cash']
-
-      paymentMethods.forEach(method => {
-        const { result } = renderHook(() => useCartStore())
-
-        act(() => {
-          result.current.setPaymentMethod(method)
-        })
-
-        expect(result.current.paymentMethod).toBe(method)
-      })
+      const total = result.current.total()
+      expect(total).toBe(11800) // 10000 + 1800
     })
   })
 
@@ -221,18 +229,16 @@ describe('Cart Store - SavanaFlow POS', () => {
       const { result } = renderHook(() => useCartStore())
 
       act(() => {
-        result.current.addItem({ id: 1, name: 'Product 1', price: 5000, quantity: 1 })
-        result.current.setCustomer({ id: 1, name: 'Customer', phone: '+224', loyalty_points: 0 })
-        result.current.setDiscount(5)
+        result.current.addItem({ id: 1, name: 'Product 1', sell_price: 5000, tax_rate: 0 })
+        result.current.addItem({ id: 2, name: 'Product 2', sell_price: 10000, tax_rate: 0 })
       })
+      expect(result.current.items).toHaveLength(2)
 
       act(() => {
-        result.current.clearCart()
+        result.current.clear()
       })
 
       expect(result.current.items).toHaveLength(0)
-      expect(result.current.customer).toBeNull()
-      expect(result.current.discount).toBe(0)
     })
   })
 })

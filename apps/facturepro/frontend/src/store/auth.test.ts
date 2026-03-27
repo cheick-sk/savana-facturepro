@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useAuthStore } from '../store/auth'
 
-// Mock API calls
+// Mock API
 vi.mock('../lib/api', () => ({
   default: {
     post: vi.fn(),
@@ -10,17 +10,15 @@ vi.mock('../lib/api', () => ({
   },
 }))
 
-describe('Auth Store', () => {
+describe('Auth Store - FacturePro', () => {
   beforeEach(() => {
     // Reset store before each test
     useAuthStore.setState({
       user: null,
-      token: null,
-      isAuthenticated: false,
-      isLoading: false,
-      error: null,
+      loading: false,
     })
     vi.clearAllMocks()
+    localStorage.clear()
   })
 
   describe('Initial State', () => {
@@ -28,96 +26,140 @@ describe('Auth Store', () => {
       const state = useAuthStore.getState()
 
       expect(state.user).toBeNull()
-      expect(state.token).toBeNull()
-      expect(state.isAuthenticated).toBe(false)
-      expect(state.isLoading).toBe(false)
-      expect(state.error).toBeNull()
+      expect(state.loading).toBe(false)
     })
   })
 
-  describe('Login Actions', () => {
-    it('should set loading state during login', async () => {
-      const { result } = renderHook(() => useAuthStore())
-
-      act(() => {
-        result.current.setLoading(true)
-      })
-
-      expect(result.current.isLoading).toBe(true)
-    })
-
-    it('should set error state', () => {
-      const { result } = renderHook(() => useAuthStore())
-      const errorMessage = 'Invalid credentials'
-
-      act(() => {
-        result.current.setError(errorMessage)
-      })
-
-      expect(result.current.error).toBe(errorMessage)
-    })
-
-    it('should clear error', () => {
-      const { result } = renderHook(() => useAuthStore())
-
-      act(() => {
-        result.current.setError('Some error')
-      })
-      expect(result.current.error).toBe('Some error')
-
-      act(() => {
-        result.current.clearError()
-      })
-      expect(result.current.error).toBeNull()
-    })
-  })
-
-  describe('User Management', () => {
-    it('should set user and authenticate', () => {
-      const { result } = renderHook(() => useAuthStore())
+  describe('Init', () => {
+    it('should restore user from localStorage', () => {
       const mockUser = {
         id: 1,
         email: 'test@example.com',
         first_name: 'Test',
         last_name: 'User',
         role: 'admin',
-        tenant_id: 1,
       }
+      localStorage.setItem('user', JSON.stringify(mockUser))
+
+      const { result } = renderHook(() => useAuthStore())
 
       act(() => {
-        result.current.setUser(mockUser)
+        result.current.init()
       })
 
       expect(result.current.user).toEqual(mockUser)
-      expect(result.current.isAuthenticated).toBe(true)
     })
 
-    it('should set token', () => {
+    it('should handle invalid localStorage data', () => {
+      localStorage.setItem('user', 'undefined')
+
       const { result } = renderHook(() => useAuthStore())
-      const mockToken = 'jwt-token-123'
 
       act(() => {
-        result.current.setToken(mockToken)
+        result.current.init()
       })
 
-      expect(result.current.token).toBe(mockToken)
+      expect(result.current.user).toBeNull()
     })
 
-    it('should logout and clear state', () => {
+    it('should handle null localStorage', () => {
+      localStorage.setItem('user', 'null')
+
       const { result } = renderHook(() => useAuthStore())
 
-      // First set some state
       act(() => {
-        result.current.setUser({
-          id: 1,
-          email: 'test@example.com',
-          first_name: 'Test',
-          last_name: 'User',
-          role: 'admin',
-          tenant_id: 1,
+        result.current.init()
+      })
+
+      expect(result.current.user).toBeNull()
+    })
+  })
+
+  describe('Login', () => {
+    it('should set loading during login', async () => {
+      const { result } = renderHook(() => useAuthStore())
+
+      const api = await import('../lib/api')
+      vi.mocked(api.default.post).mockImplementation(() =>
+        new Promise(resolve => setTimeout(() => resolve({
+          data: { access_token: 'token', user: { id: 1, email: 'test@test.com', first_name: 'Test', last_name: 'User', role: 'admin' } }
+        } as any, 100))
+      )
+
+      act(() => {
+        result.current.login('test@test.com', 'password')
+      })
+
+      // Loading should be true during the async call
+      expect(result.current.loading).toBe(true)
+    })
+
+    it('should set user on successful login', async () => {
+      const { result } = renderHook(() => useAuthStore())
+
+      const api = await import('../lib/api')
+      const mockUser = {
+        id: 1,
+        email: 'test@example.com',
+        first_name: 'Test',
+        last_name: 'User',
+        role: 'admin',
+      }
+
+      vi.mocked(api.default.post).mockResolvedValueOnce({
+        data: {
+          access_token: 'test-token',
+          refresh_token: 'refresh-token',
+          user: mockUser,
+        },
+      } as any)
+
+      await act(async () => {
+        await result.current.login('test@example.com', 'password')
+      })
+
+      expect(result.current.user).toEqual(mockUser)
+      expect(result.current.loading).toBe(false)
+      expect(localStorage.getItem('access_token')).toBe('test-token')
+    })
+
+    it('should handle login error', async () => {
+      const { result } = renderHook(() => useAuthStore())
+
+      const api = await import('../lib/api')
+      vi.mocked(api.default.post).mockRejectedValueOnce(new Error('Invalid credentials'))
+
+      await act(async () => {
+        try {
+          await result.current.login('test@example.com', 'wrong')
+        } catch (e) {
+          expect(e).toBeDefined()
+        }
+      })
+
+      expect(result.current.user).toBeNull()
+      expect(result.current.loading).toBe(false)
+    })
+  })
+
+  describe('Logout', () => {
+    it('should clear user on logout', () => {
+      const { result } = renderHook(() => useAuthStore())
+
+      // First set a user
+      act(() => {
+        useAuthStore.setState({
+          user: {
+            id: 1,
+            email: 'test@example.com',
+            first_name: 'Test',
+            last_name: 'User',
+            role: 'admin',
+          },
         })
-        result.current.setToken('token')
       })
+
+      expect(result.current.user).not.toBeNull()
 
       // Then logout
       act(() => {
@@ -125,21 +167,20 @@ describe('Auth Store', () => {
       })
 
       expect(result.current.user).toBeNull()
-      expect(result.current.token).toBeNull()
-      expect(result.current.isAuthenticated).toBe(false)
     })
-  })
 
-  describe('Persisted State', () => {
-    it('should persist auth state to localStorage on login', () => {
+    it('should clear localStorage on logout', () => {
+      localStorage.setItem('access_token', 'token')
+      localStorage.setItem('user', JSON.stringify({ id: 1 }))
+
       const { result } = renderHook(() => useAuthStore())
 
       act(() => {
-        result.current.setToken('persisted-token')
+        result.current.logout()
       })
 
-      // Check that localStorage was called
-      expect(window.localStorage.setItem).toHaveBeenCalled()
+      expect(localStorage.getItem('access_token')).toBeNull()
+      expect(localStorage.getItem('user')).toBeNull()
     })
   })
 })

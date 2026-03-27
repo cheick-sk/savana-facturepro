@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useAuthStore } from '../store/auth'
 
-// Mock API calls
+// Mock API
 vi.mock('../lib/api', () => ({
   default: {
     post: vi.fn(),
@@ -15,13 +15,10 @@ describe('Auth Store - SavanaFlow', () => {
     // Reset store before each test
     useAuthStore.setState({
       user: null,
-      token: null,
-      isAuthenticated: false,
-      isLoading: false,
-      error: null,
-      currentStore: null,
+      loading: false,
     })
     vi.clearAllMocks()
+    localStorage.clear()
   })
 
   describe('Initial State', () => {
@@ -29,136 +26,161 @@ describe('Auth Store - SavanaFlow', () => {
       const state = useAuthStore.getState()
 
       expect(state.user).toBeNull()
-      expect(state.token).toBeNull()
-      expect(state.isAuthenticated).toBe(false)
-      expect(state.isLoading).toBe(false)
-      expect(state.error).toBeNull()
-      expect(state.currentStore).toBeNull()
+      expect(state.loading).toBe(false)
     })
   })
 
-  describe('Store Management', () => {
-    it('should set current store', () => {
-      const { result } = renderHook(() => useAuthStore())
-      const mockStore = {
+  describe('Init', () => {
+    it('should restore user from localStorage', () => {
+      const mockUser = {
         id: 1,
-        name: 'Main Store',
-        address: 'Conakry, Guinea',
-        phone: '+224 123 456 789',
+        email: 'test@example.com',
+        first_name: 'Test',
+        last_name: 'User',
+        role: 'admin',
       }
+      localStorage.setItem('user', JSON.stringify(mockUser))
+
+      const { result } = renderHook(() => useAuthStore())
 
       act(() => {
-        result.current.setCurrentStore(mockStore)
+        result.current.init()
       })
 
-      expect(result.current.currentStore).toEqual(mockStore)
+      expect(result.current.user).toEqual(mockUser)
     })
 
-    it('should clear store on logout', () => {
+    it('should handle invalid localStorage data', () => {
+      localStorage.setItem('user', 'undefined')
+
       const { result } = renderHook(() => useAuthStore())
 
       act(() => {
-        result.current.setCurrentStore({
-          id: 1,
-          name: 'Main Store',
-          address: 'Conakry',
-          phone: '+224',
-        })
-        result.current.setUser({
-          id: 1,
-          email: 'test@example.com',
-          first_name: 'Test',
-          last_name: 'User',
-          role: 'cashier',
-          tenant_id: 1,
+        result.current.init()
+      })
+
+      expect(result.current.user).toBeNull()
+    })
+
+    it('should handle null localStorage', () => {
+      localStorage.setItem('user', 'null')
+
+      const { result } = renderHook(() => useAuthStore())
+
+      act(() => {
+        result.current.init()
+      })
+
+      expect(result.current.user).toBeNull()
+    })
+  })
+
+  describe('Login', () => {
+    it('should set loading during login', async () => {
+      const { result } = renderHook(() => useAuthStore())
+
+      const api = await import('../lib/api')
+      vi.mocked(api.default.post).mockImplementation(() =>
+        new Promise(resolve => setTimeout(() => resolve({
+          data: { access_token: 'token', user: { id: 1, email: 'test@test.com', first_name: 'Test', last_name: 'User', role: 'admin' } }
+        } as any, 100))
+      )
+
+      act(() => {
+        result.current.login('test@test.com', 'password')
+      })
+
+      // Loading should be true during the async call
+      expect(result.current.loading).toBe(true)
+    })
+
+    it('should set user on successful login', async () => {
+      const { result } = renderHook(() => useAuthStore())
+
+      const api = await import('../lib/api')
+      const mockUser = {
+        id: 1,
+        email: 'test@example.com',
+        first_name: 'Test',
+        last_name: 'User',
+        role: 'admin',
+      }
+
+      vi.mocked(api.default.post).mockResolvedValueOnce({
+        data: {
+          access_token: 'test-token',
+          refresh_token: 'refresh-token',
+          user: mockUser,
+        },
+      } as any)
+
+      await act(async () => {
+        await result.current.login('test@example.com', 'password')
+      })
+
+      expect(result.current.user).toEqual(mockUser)
+      expect(result.current.loading).toBe(false)
+      expect(localStorage.getItem('access_token')).toBe('test-token')
+    })
+
+    it('should handle login error', async () => {
+      const { result } = renderHook(() => useAuthStore())
+
+      const api = await import('../lib/api')
+      vi.mocked(api.default.post).mockRejectedValueOnce(new Error('Invalid credentials'))
+
+      await act(async () => {
+        try {
+          await result.current.login('test@example.com', 'wrong')
+        } catch (e) {
+          expect(e).toBeDefined()
+        }
+      })
+
+      expect(result.current.user).toBeNull()
+      expect(result.current.loading).toBe(false)
+    })
+  })
+
+  describe('Logout', () => {
+    it('should clear user on logout', () => {
+      const { result } = renderHook(() => useAuthStore())
+
+      // First set a user
+      act(() => {
+        useAuthStore.setState({
+          user: {
+            id: 1,
+            email: 'test@example.com',
+            first_name: 'Test',
+            last_name: 'User',
+            role: 'admin',
+          },
         })
       })
+
+      expect(result.current.user).not.toBeNull()
+
+      // Then logout
+      act(() => {
+        result.current.logout()
+      })
+
+      expect(result.current.user).toBeNull()
+    })
+
+    it('should clear localStorage on logout', () => {
+      localStorage.setItem('access_token', 'token')
+      localStorage.setItem('user', JSON.stringify({ id: 1 }))
+
+      const { result } = renderHook(() => useAuthStore())
 
       act(() => {
         result.current.logout()
       })
 
-      expect(result.current.currentStore).toBeNull()
-      expect(result.current.user).toBeNull()
-    })
-  })
-
-  describe('User Roles', () => {
-    it('should handle admin role', () => {
-      const { result } = renderHook(() => useAuthStore())
-
-      act(() => {
-        result.current.setUser({
-          id: 1,
-          email: 'admin@example.com',
-          first_name: 'Admin',
-          last_name: 'User',
-          role: 'admin',
-          tenant_id: 1,
-        })
-      })
-
-      expect(result.current.user?.role).toBe('admin')
-    })
-
-    it('should handle cashier role', () => {
-      const { result } = renderHook(() => useAuthStore())
-
-      act(() => {
-        result.current.setUser({
-          id: 2,
-          email: 'cashier@example.com',
-          first_name: 'Cashier',
-          last_name: 'User',
-          role: 'cashier',
-          tenant_id: 1,
-        })
-      })
-
-      expect(result.current.user?.role).toBe('cashier')
-    })
-
-    it('should handle manager role', () => {
-      const { result } = renderHook(() => useAuthStore())
-
-      act(() => {
-        result.current.setUser({
-          id: 3,
-          email: 'manager@example.com',
-          first_name: 'Manager',
-          last_name: 'User',
-          role: 'manager',
-          tenant_id: 1,
-        })
-      })
-
-      expect(result.current.user?.role).toBe('manager')
-    })
-  })
-
-  describe('Error Handling', () => {
-    it('should set error message', () => {
-      const { result } = renderHook(() => useAuthStore())
-
-      act(() => {
-        result.current.setError('Invalid login credentials')
-      })
-
-      expect(result.current.error).toBe('Invalid login credentials')
-    })
-
-    it('should clear error', () => {
-      const { result } = renderHook(() => useAuthStore())
-
-      act(() => {
-        result.current.setError('Error')
-      })
-      expect(result.current.error).toBe('Error')
-
-      act(() => {
-        result.current.clearError()
-      })
-      expect(result.current.error).toBeNull()
+      expect(localStorage.getItem('access_token')).toBeNull()
+      expect(localStorage.getItem('user')).toBeNull()
     })
   })
 })
