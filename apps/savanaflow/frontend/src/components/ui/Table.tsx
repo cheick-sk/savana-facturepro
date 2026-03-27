@@ -66,11 +66,12 @@ export function TableRow({ children, className, onClick }: TableRowProps) {
 interface TableHeadProps {
   children: ReactNode;
   className?: string;
+  colSpan?: number;
 }
 
-export function TableHead({ children, className }: TableHeadProps) {
+export function TableHead({ children, className, colSpan }: TableHeadProps) {
   return (
-    <th className={twMerge('px-4 py-3 font-semibold text-gray-700 dark:text-gray-300', className)}>
+    <th colSpan={colSpan} className={twMerge('px-4 py-3 font-semibold text-gray-700 dark:text-gray-300', className)}>
       {children}
     </th>
   );
@@ -79,11 +80,12 @@ export function TableHead({ children, className }: TableHeadProps) {
 interface TableCellProps {
   children: ReactNode;
   className?: string;
+  colSpan?: number;
 }
 
-export function TableCell({ children, className }: TableCellProps) {
+export function TableCell({ children, className, colSpan }: TableCellProps) {
   return (
-    <td className={twMerge('px-4 py-3 text-gray-600 dark:text-gray-400', className)}>
+    <td colSpan={colSpan} className={twMerge('px-4 py-3 text-gray-600 dark:text-gray-400', className)}>
       {children}
     </td>
   );
