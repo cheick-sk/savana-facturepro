@@ -1,0 +1,1 @@
+"""SavanaFlow POS Celery Tasks"""

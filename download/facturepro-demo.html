@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FacturePro - Demo Facturation Multi-Devises</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Inter', sans-serif; }
+    @media print {
+      .no-print { display: none !important; }
+      body { background: white !important; }
+    }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+  <div id="app"></div>
+
+  <script>
+    // ═══════════════════════════════════════════════════════════════
+    // SYSTÈME MULTI-DEVISES
+    // ═══════════════════════════════════════════════════════════════
+    const CURRENCIES = [
+      { code: 'GNF', name: 'Franc Guinéen', symbol: 'FG', flag: '🇬🇳', decimalPlaces: 0, isDefault: true },
+      { code: 'XOF', name: 'Franc CFA (BCEAO)', symbol: 'CFA', flag: '🇸🇳', decimalPlaces: 0 },
+      { code: 'XAF', name: 'Franc CFA (BEAC)', symbol: 'FCFA', flag: '🇨🇲', decimalPlaces: 0 },
+      { code: 'EUR', name: 'Euro', symbol: '€', flag: '🇪🇺', decimalPlaces: 2 },
+      { code: 'USD', name: 'Dollar US', symbol: '$', flag: '🇺🇸', decimalPlaces: 2 },
+    ];
+
+    const INVERSE_RATES = { GNF: 1, XOF: 17.24, XAF: 17.24, EUR: 11363.64, USD: 10416.67 };
+
+    let activeCurrency = CURRENCIES[0];
+
+    function formatCurrency(amount, currencyCode = 'GNF') {
+      const currency = CURRENCIES.find(c => c.code === currencyCode) || CURRENCIES[0];
+      if (currencyCode === 'GNF') {
+        return `${currency.symbol} ${new Intl.NumberFormat('fr-GN').format(Math.round(amount))}`;
+      }
+      return new Intl.NumberFormat('fr-FR', {
+        style: 'currency',
+        currency: currencyCode,
+        minimumFractionDigits: currency.decimalPlaces
+      }).format(amount);
+    }
+
+    function convertToGNF(amount, fromCurrency) {
+      return amount * (INVERSE_RATES[fromCurrency] || 1);
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // DONNÉES
+    // ═══════════════════════════════════════════════════════════════
+    const clients = [
+      { id: 1, name: 'SARL Conakry Commerce', email: 'contact@conakrycommerce.gn', phone: '+224 622 12 34 56', address: 'Conakry, Kaloum', nif: 'NIF-2024-00123' },
+      { id: 2, name: 'Entreprise Mamadou Diallo', email: 'mamadou.diallo@email.gn', phone: '+224 664 98 76 54', address: 'Nzérékoré, Centre', nif: 'NIF-2024-00456' },
+      { id: 3, name: 'Kankan Trading SARL', email: 'info@kankantrading.gn', phone: '+224 655 33 22 11', address: 'Kankan, Marché Central', nif: 'NIF-2024-00789' },
+    ];
+
+    const products = [
+      { id: 1, name: 'Consultation informatique', unit: 'heure', price: 150000, taxRate: 0 },
+      { id: 2, name: 'Développement web', unit: 'jour', price: 500000, taxRate: 0 },
+      { id: 3, name: 'Maintenance serveur', unit: 'mois', price: 800000, taxRate: 0 },
+      { id: 4, name: 'Formation bureautique', unit: 'session', price: 200000, taxRate: 0 },
+      { id: 5, name: 'Licence logiciel', unit: 'licence', price: 350000, taxRate: 0 },
+    ];
+
+    const invoiceStatuses = {
+      DRAFT: { label: 'Brouillon', color: 'gray' },
+      SENT: { label: 'Envoyée', color: 'blue' },
+      PAID: { label: 'Payée', color: 'green' },
+      OVERDUE: { label: 'En retard', color: 'red' },
+    };
+
+    let invoices = [
+      {
+        id: 1,
+        number: 'FAC-2024-0001',
+        client: clients[0],
+        items: [
+          { product: products[1], quantity: 5, price: 500000 },
+          { product: products[0], quantity: 2, price: 150000 },
+        ],
+        status: 'PAID',
+        currency: 'GNF',
+        date: new Date('2024-01-15'),
+        dueDate: new Date('2024-02-15'),
+      },
+      {
+        id: 2,
+        number: 'FAC-2024-0002',
+        client: clients[1],
+        items: [
+          { product: products[3], quantity: 3, price: 200000 },
+        ],
+        status: 'SENT',
+        currency: 'GNF',
+        date: new Date('2024-01-20'),
+        dueDate: new Date('2024-02-20'),
+      },
+    ];
+
+    // ═══════════════════════════════════════════════════════════════
+    // ÉTAT
+    // ═══════════════════════════════════════════════════════════════
+    let showCreateInvoice = false;
+    let showCurrencySelector = false;
+    let selectedClient = null;
+    let invoiceItems = [];
+    let invoiceCurrency = 'GNF';
+    let invoiceNotes = '';
+    let showInvoicePreview = false;
+    let previewInvoice = null;
+
+    // ═══════════════════════════════════════════════════════════════
+    // FONCTIONS
+    // ═══════════════════════════════════════════════════════════════
+    function generateInvoiceNumber() {
+      const year = new Date().getFullYear();
+      const num = (invoices.length + 1).toString().padStart(4, '0');
+      return `FAC-${year}-${num}`;
+    }
+
+    function calculateInvoiceTotal(items) {
+      return items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
+    }
+
+    function createInvoice() {
+      if (!selectedClient || invoiceItems.length === 0) {
+        alert('Veuillez sélectionner un client et ajouter au moins une ligne');
+        return;
+      }
+
+      const invoice = {
+        id: invoices.length + 1,
+        number: generateInvoiceNumber(),
+        client: selectedClient,
+        items: [...invoiceItems],
+        status: 'DRAFT',
+        currency: invoiceCurrency,
+        date: new Date(),
+        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        notes: invoiceNotes,
+      };
+
+      invoices.push(invoice);
+      showCreateInvoice = false;
+      selectedClient = null;
+      invoiceItems = [];
+      invoiceNotes = '';
+      render();
+    }
+
+    function addInvoiceItem() {
+      invoiceItems.push({ product: products[0], quantity: 1, price: products[0].price });
+      render();
+    }
+
+    function updateInvoiceItem(index, field, value) {
+      if (field === 'product') {
+        const product = products.find(p => p.id === +value);
+        invoiceItems[index].product = product;
+        invoiceItems[index].price = product.price;
+      } else {
+        invoiceItems[index][field] = +value;
+      }
+      render();
+    }
+
+    function removeInvoiceItem(index) {
+      invoiceItems.splice(index, 1);
+      render();
+    }
+
+    function previewInvoiceDoc(invoice) {
+      previewInvoice = invoice;
+      showInvoicePreview = true;
+      render();
+    }
+
+    function printInvoice() {
+      window.print();
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // RENDU
+    // ═══════════════════════════════════════════════════════════════
+    function render() {
+      const app = document.getElementById('app');
+
+      app.innerHTML = `
+        <div class="min-h-screen">
+          <!-- Header -->
+          <header class="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-4 shadow-lg no-print">
+            <div class="max-w-7xl mx-auto flex items-center justify-between">
+              <div class="flex items-center gap-4">
+                <h1 class="text-2xl font-bold">📄 FacturePro</h1>
+                <span class="bg-blue-500 px-3 py-1 rounded-full text-sm">Guinée 🇬🇳</span>
+              </div>
+              <div class="flex items-center gap-3">
+                <button onclick="showCurrencySelector = !showCurrencySelector; render()" 
+                  class="flex items-center gap-2 px-4 py-2 bg-blue-700 rounded-lg hover:bg-blue-800 transition">
+                  <span class="text-lg">${activeCurrency.flag}</span>
+                  <span>${activeCurrency.code}</span>
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </header>
+
+          <!-- Currency Selector -->
+          ${showCurrencySelector ? `
+            <div class="fixed inset-0 bg-black/50 z-50 flex items-start justify-end no-print">
+              <div class="bg-white rounded-l-xl w-72 mt-16 shadow-xl">
+                <div class="p-3 border-b bg-gray-50 flex justify-between items-center">
+                  <span class="text-sm font-medium">Sélectionner une devise</span>
+                  <button onclick="showCurrencySelector = false; render()" class="text-gray-400 hover:text-gray-600">✕</button>
+                </div>
+                <div class="max-h-96 overflow-auto">
+                  ${CURRENCIES.map(c => `
+                    <button onclick="activeCurrency = CURRENCIES.find(cur => cur.code === '${c.code}'); showCurrencySelector = false; render()"
+                      class="w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center gap-3
+                        ${activeCurrency.code === c.code ? 'bg-blue-50 text-blue-600' : ''}">
+                      <span class="text-xl">${c.flag}</span>
+                      <span class="flex-1">${c.name}</span>
+                      <span class="text-gray-400">${c.symbol}</span>
+                      ${c.isDefault ? '<span class="text-xs bg-green-100 text-green-600 px-1 rounded">Défaut</span>' : ''}
+                    </button>
+                  `).join('')}
+                </div>
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- Main Content -->
+          <main class="max-w-7xl mx-auto p-6">
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 no-print">
+              <div class="bg-white rounded-xl p-4 shadow-sm border">
+                <div class="text-sm text-gray-500 mb-1">Total facturé</div>
+                <div class="text-2xl font-bold text-blue-600">${formatCurrency(invoices.reduce((s, i) => s + calculateInvoiceTotal(i.items), 0), activeCurrency.code)}</div>
+              </div>
+              <div class="bg-white rounded-xl p-4 shadow-sm border">
+                <div class="text-sm text-gray-500 mb-1">Factures payées</div>
+                <div class="text-2xl font-bold text-green-600">${invoices.filter(i => i.status === 'PAID').length}</div>
+              </div>
+              <div class="bg-white rounded-xl p-4 shadow-sm border">
+                <div class="text-sm text-gray-500 mb-1">En attente</div>
+                <div class="text-2xl font-bold text-yellow-600">${invoices.filter(i => i.status === 'SENT' || i.status === 'DRAFT').length}</div>
+              </div>
+              <div class="bg-white rounded-xl p-4 shadow-sm border">
+                <div class="text-sm text-gray-500 mb-1">En retard</div>
+                <div class="text-2xl font-bold text-red-600">${invoices.filter(i => i.status === 'OVERDUE').length}</div>
+              </div>
+            </div>
+
+            <!-- Toolbar -->
+            <div class="flex justify-between items-center mb-4 no-print">
+              <h2 class="text-xl font-semibold">Factures</h2>
+              <button onclick="showCreateInvoice = true; render()" 
+                class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+                Nouvelle facture
+              </button>
+            </div>
+
+            <!-- Create Invoice Form -->
+            ${showCreateInvoice ? `
+              <div class="bg-white rounded-xl p-6 shadow-sm border mb-6 no-print">
+                <h3 class="text-lg font-semibold mb-4">Nouvelle facture</h3>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <div>
+                    <label class="block text-sm text-gray-500 mb-1">Client *</label>
+                    <select onchange="selectedClient = clients.find(c => c.id === +this.value); render()" 
+                      class="w-full px-3 py-2 border rounded-lg">
+                      <option value="">-- Sélectionner --</option>
+                      ${clients.map(c => `<option value="${c.id}" ${selectedClient?.id === c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-sm text-gray-500 mb-1">Devise</label>
+                    <select onchange="invoiceCurrency = this.value; render()" class="w-full px-3 py-2 border rounded-lg">
+                      ${CURRENCIES.map(c => `<option value="${c.code}" ${invoiceCurrency === c.code ? 'selected' : ''}>${c.flag} ${c.name}</option>`).join('')}
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-sm text-gray-500 mb-1">Notes</label>
+                    <input type="text" placeholder="Notes optionnelles" value="${invoiceNotes}" 
+                      onchange="invoiceNotes = this.value" class="w-full px-3 py-2 border rounded-lg">
+                  </div>
+                </div>
+
+                <!-- Invoice Items -->
+                <div class="mb-4">
+                  <div class="flex justify-between items-center mb-2">
+                    <label class="text-sm font-medium">Lignes de facturation</label>
+                    <button onclick="addInvoiceItem()" class="text-sm px-3 py-1 border rounded-lg hover:bg-gray-50">
+                      + Ajouter une ligne
+                    </button>
+                  </div>
+                  
+                  <div class="border rounded-lg overflow-hidden">
+                    <table class="w-full text-sm">
+                      <thead class="bg-gray-50">
+                        <tr>
+                          <th class="px-4 py-2 text-left text-gray-500">Produit/Service</th>
+                          <th class="px-4 py-2 text-right text-gray-500 w-24">Quantité</th>
+                          <th class="px-4 py-2 text-right text-gray-500 w-32">Prix unitaire</th>
+                          <th class="px-4 py-2 text-right text-gray-500 w-32">Total</th>
+                          <th class="px-4 py-2 w-12"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        ${invoiceItems.map((item, idx) => `
+                          <tr class="border-t">
+                            <td class="px-4 py-2">
+                              <select onchange="updateInvoiceItem(${idx}, 'product', this.value)" 
+                                class="w-full px-2 py-1 border rounded">
+                                ${products.map(p => `<option value="${p.id}" ${item.product.id === p.id ? 'selected' : ''}>${p.name}</option>`).join('')}
+                              </select>
+                            </td>
+                            <td class="px-4 py-2">
+                              <input type="number" min="1" value="${item.quantity}" 
+                                onchange="updateInvoiceItem(${idx}, 'quantity', this.value)"
+                                class="w-full px-2 py-1 border rounded text-right">
+                            </td>
+                            <td class="px-4 py-2">
+                              <input type="number" min="0" value="${item.price}" 
+                                onchange="updateInvoiceItem(${idx}, 'price', this.value)"
+                                class="w-full px-2 py-1 border rounded text-right">
+                            </td>
+                            <td class="px-4 py-2 text-right font-medium">
+                              ${formatCurrency(item.quantity * item.price, invoiceCurrency)}
+                            </td>
+                            <td class="px-4 py-2">
+                              <button onclick="removeInvoiceItem(${idx})" class="text-red-500 hover:text-red-700">✕</button>
+                            </td>
+                          </tr>
+                        `).join('')}
+                        ${invoiceItems.length === 0 ? `
+                          <tr>
+                            <td colspan="5" class="px-4 py-8 text-center text-gray-400">
+                              Aucune ligne ajoutée
+                            </td>
+                          </tr>
+                        ` : ''}
+                      </tbody>
+                    </table>
+                  </div>
+                  
+                  ${invoiceItems.length > 0 ? `
+                    <div class="mt-4 text-right">
+                      <div class="text-lg font-bold">
+                        Total: ${formatCurrency(calculateInvoiceTotal(invoiceItems), invoiceCurrency)}
+                      </div>
+                    </div>
+                  ` : ''}
+                </div>
+
+                <div class="flex gap-3">
+                  <button onclick="createInvoice()" 
+                    class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    Créer la facture
+                  </button>
+                  <button onclick="showCreateInvoice = false; selectedClient = null; invoiceItems = []; render()" 
+                    class="px-4 py-2 border rounded-lg hover:bg-gray-50">
+                    Annuler
+                  </button>
+                </div>
+              </div>
+            ` : ''}
+
+            <!-- Invoices Table -->
+            <div class="bg-white rounded-xl shadow-sm border overflow-hidden no-print">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-50">
+                  <tr>
+                    <th class="px-4 py-3 text-left text-gray-500 font-medium">N° Facture</th>
+                    <th class="px-4 py-3 text-left text-gray-500 font-medium">Client</th>
+                    <th class="px-4 py-3 text-left text-gray-500 font-medium">Statut</th>
+                    <th class="px-4 py-3 text-right text-gray-500 font-medium">Montant</th>
+                    <th class="px-4 py-3 text-left text-gray-500 font-medium">Date</th>
+                    <th class="px-4 py-3 text-center text-gray-500 font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${invoices.map(inv => `
+                    <tr class="border-t hover:bg-gray-50">
+                      <td class="px-4 py-3 font-mono font-medium">${inv.number}</td>
+                      <td class="px-4 py-3">
+                        <div class="font-medium">${inv.client.name}</div>
+                        <div class="text-xs text-gray-400">${inv.client.email}</div>
+                      </td>
+                      <td class="px-4 py-3">
+                        <span class="px-2 py-1 rounded-full text-xs font-medium
+                          ${inv.status === 'PAID' ? 'bg-green-100 text-green-700' : ''}
+                          ${inv.status === 'SENT' ? 'bg-blue-100 text-blue-700' : ''}
+                          ${inv.status === 'DRAFT' ? 'bg-gray-100 text-gray-700' : ''}
+                          ${inv.status === 'OVERDUE' ? 'bg-red-100 text-red-700' : ''}
+                        ">
+                          ${invoiceStatuses[inv.status].label}
+                        </span>
+                      </td>
+                      <td class="px-4 py-3 text-right font-medium">
+                        ${formatCurrency(calculateInvoiceTotal(inv.items), inv.currency)}
+                      </td>
+                      <td class="px-4 py-3 text-gray-500">
+                        ${inv.date.toLocaleDateString('fr-FR')}
+                      </td>
+                      <td class="px-4 py-3">
+                        <div class="flex justify-center gap-2">
+                          <button onclick="previewInvoiceDoc(invoices.find(i => i.id === ${inv.id}))" 
+                            class="p-1 hover:bg-gray-100 rounded" title="Aperçu">
+                            👁️
+                          </button>
+                          <button onclick="printInvoice()" class="p-1 hover:bg-gray-100 rounded" title="Imprimer">
+                            🖨️
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </main>
+        </div>
+
+        <!-- Invoice Preview Modal -->
+        ${showInvoicePreview && previewInvoice ? `
+          <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-xl w-full max-w-3xl max-h-[90vh] overflow-auto shadow-2xl">
+              <div class="sticky top-0 bg-white border-b px-4 py-3 flex justify-between items-center no-print">
+                <h3 class="font-semibold">Aperçu de la facture</h3>
+                <button onclick="showInvoicePreview = false; render()" class="text-gray-400 hover:text-gray-600">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                  </svg>
+                </button>
+              </div>
+              
+              <!-- Invoice Document -->
+              <div class="p-8" id="invoice-document">
+                <div class="max-w-2xl mx-auto">
+                  <!-- Header -->
+                  <div class="flex justify-between items-start mb-8">
+                    <div>
+                      <h1 class="text-2xl font-bold text-blue-600">FacturePro</h1>
+                      <p class="text-sm text-gray-500">Système de facturation</p>
+                      <p class="text-sm text-gray-500">Conakry, Guinée</p>
+                    </div>
+                    <div class="text-right">
+                      <div class="text-3xl font-bold text-gray-800">${previewInvoice.number}</div>
+                      <div class="text-sm text-gray-500 mt-1">
+                        Date: ${previewInvoice.date.toLocaleDateString('fr-FR')}
+                      </div>
+                      <div class="text-sm text-gray-500">
+                        Échéance: ${previewInvoice.dueDate.toLocaleDateString('fr-FR')}
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Client -->
+                  <div class="bg-gray-50 rounded-lg p-4 mb-8">
+                    <div class="text-xs text-gray-500 uppercase mb-1">Facturer à</div>
+                    <div class="font-semibold">${previewInvoice.client.name}</div>
+                    <div class="text-sm text-gray-600">${previewInvoice.client.address}</div>
+                    <div class="text-sm text-gray-600">${previewInvoice.client.phone}</div>
+                    <div class="text-sm text-gray-600">${previewInvoice.client.nif}</div>
+                  </div>
+
+                  <!-- Items -->
+                  <table class="w-full mb-8">
+                    <thead>
+                      <tr class="border-b-2 border-gray-200">
+                        <th class="text-left py-2 text-sm text-gray-500">Description</th>
+                        <th class="text-right py-2 text-sm text-gray-500 w-20">Qté</th>
+                        <th class="text-right py-2 text-sm text-gray-500 w-28">Prix unit.</th>
+                        <th class="text-right py-2 text-sm text-gray-500 w-28">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${previewInvoice.items.map(item => `
+                        <tr class="border-b">
+                          <td class="py-3">${item.product.name}</td>
+                          <td class="text-right">${item.quantity}</td>
+                          <td class="text-right">${formatCurrency(item.price, previewInvoice.currency)}</td>
+                          <td class="text-right font-medium">${formatCurrency(item.quantity * item.price, previewInvoice.currency)}</td>
+                        </tr>
+                      `).join('')}
+                    </tbody>
+                  </table>
+
+                  <!-- Total -->
+                  <div class="flex justify-end">
+                    <div class="w-64">
+                      <div class="flex justify-between py-2 border-b">
+                        <span class="text-gray-500">Sous-total</span>
+                        <span>${formatCurrency(calculateInvoiceTotal(previewInvoice.items), previewInvoice.currency)}</span>
+                      </div>
+                      <div class="flex justify-between py-2 border-b">
+                        <span class="text-gray-500">TVA</span>
+                        <span>0 ${previewInvoice.currency === 'GNF' ? 'FG' : previewInvoice.currency}</span>
+                      </div>
+                      <div class="flex justify-between py-3 text-xl font-bold">
+                        <span>Total</span>
+                        <span class="text-blue-600">${formatCurrency(calculateInvoiceTotal(previewInvoice.items), previewInvoice.currency)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Footer -->
+                  <div class="mt-12 pt-6 border-t text-center text-sm text-gray-500">
+                    <p>Merci pour votre confiance!</p>
+                    <p class="mt-1">Paiement par virement bancaire ou Mobile Money</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Actions -->
+              <div class="sticky bottom-0 bg-white border-t p-4 flex gap-3 justify-end no-print">
+                <button onclick="printInvoice()" 
+                  class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                  🖨️ Imprimer
+                </button>
+                <button onclick="showInvoicePreview = false; render()" 
+                  class="px-4 py-2 border rounded-lg hover:bg-gray-50">
+                  Fermer
+                </button>
+              </div>
+            </div>
+          </div>
+        ` : ''}
+      `;
+    }
+
+    // Initial render
+    render();
+  </script>
+</body>
+</html>

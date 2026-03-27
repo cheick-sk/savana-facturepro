@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SchoolFlow - Demo Gestion Scolaire Guinée</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Inter', sans-serif; }
+    .grade-A { background: #dcfce7; color: #166534; }
+    .grade-B { background: #dbeafe; color: #1e40af; }
+    .grade-C { background: #fef3c7; color: #92400e; }
+    .grade-D { background: #fee2e2; color: #991b1b; }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+  <div id="app"></div>
+
+  <script>
+    // ═══════════════════════════════════════════════════════════════
+    // DONNÉES
+    // ═══════════════════════════════════════════════════════════════
+    const CURRENCIES = [
+      { code: 'GNF', name: 'Franc Guinéen', symbol: 'FG', flag: '🇬🇳' },
+      { code: 'XOF', name: 'Franc CFA', symbol: 'CFA', flag: '🇸🇳' },
+      { code: 'EUR', name: 'Euro', symbol: '€', flag: '🇪🇺' },
+    ];
+
+    let activeCurrency = CURRENCIES[0];
+
+    const classes = [
+      { id: 1, name: 'CP1', level: 'Primaire', students: 45 },
+      { id: 2, name: 'CP2', level: 'Primaire', students: 42 },
+      { id: 3, name: 'CE1', level: 'Primaire', students: 48 },
+      { id: 4, name: 'CE2', level: 'Primaire', students: 44 },
+      { id: 5, name: 'CM1', level: 'Primaire', students: 40 },
+      { id: 6, name: 'CM2', level: 'Primaire', students: 38 },
+      { id: 7, name: '6ème', level: 'Collège', students: 52 },
+      { id: 8, name: '5ème', level: 'Collège', students: 48 },
+      { id: 9, name: '4ème', level: 'Collège', students: 50 },
+      { id: 10, name: '3ème', level: 'Collège', students: 46 },
+      { id: 11, name: '2nde', level: 'Lycée', students: 55 },
+      { id: 12, name: '1ère', level: 'Lycée', students: 42 },
+      { id: 13, name: 'Terminale', level: 'Lycée', students: 38 },
+    ];
+
+    const subjects = [
+      { id: 1, name: 'Mathématiques', coefficient: 4 },
+      { id: 2, name: 'Français', coefficient: 4 },
+      { id: 3, name: 'Anglais', coefficient: 3 },
+      { id: 4, name: 'Sciences', coefficient: 3 },
+      { id: 5, name: 'Histoire-Géo', coefficient: 2 },
+      { id: 6, name: 'Sport', coefficient: 1 },
+    ];
+
+    const students = [
+      { id: 1, firstName: 'Amadou', lastName: 'Diallo', class: '3ème', gender: 'M', age: 14, parentPhone: '+224 622 12 34 56', feesPaid: true },
+      { id: 2, firstName: 'Fatou', lastName: 'Condé', class: '3ème', gender: 'F', age: 14, parentPhone: '+224 664 98 76 54', feesPaid: true },
+      { id: 3, firstName: 'Ibrahima', lastName: 'Camara', class: '3ème', gender: 'M', age: 15, parentPhone: '+224 655 33 22 11', feesPaid: false },
+      { id: 4, firstName: 'Mariama', lastName: 'Touré', class: '3ème', gender: 'F', age: 14, parentPhone: '+224 677 45 67 89', feesPaid: true },
+      { id: 5, firstName: 'Mamadou', lastName: 'Bah', class: '3ème', gender: 'M', age: 15, parentPhone: '+224 688 90 12 34', feesPaid: true },
+      { id: 6, firstName: 'Aissatou', lastName: 'Sow', class: '3ème', gender: 'F', age: 14, parentPhone: '+224 699 56 78 90', feesPaid: false },
+      { id: 7, firstName: 'Ousmane', lastName: 'Diarra', class: '3ème', gender: 'M', age: 15, parentPhone: '+224 611 23 45 67', feesPaid: true },
+      { id: 8, firstName: 'Kadiatou', lastName: 'Keita', class: '3ème', gender: 'F', age: 14, parentPhone: '+224 622 34 56 78', feesPaid: true },
+    ];
+
+    const grades = [
+      { studentId: 1, subjectId: 1, value: 15, max: 20, term: 'Trimestre 1' },
+      { studentId: 1, subjectId: 2, value: 14, max: 20, term: 'Trimestre 1' },
+      { studentId: 1, subjectId: 3, value: 16, max: 20, term: 'Trimestre 1' },
+      { studentId: 2, subjectId: 1, value: 17, max: 20, term: 'Trimestre 1' },
+      { studentId: 2, subjectId: 2, value: 18, max: 20, term: 'Trimestre 1' },
+      { studentId: 2, subjectId: 3, value: 15, max: 20, term: 'Trimestre 1' },
+      { studentId: 3, subjectId: 1, value: 10, max: 20, term: 'Trimestre 1' },
+      { studentId: 3, subjectId: 2, value: 11, max: 20, term: 'Trimestre 1' },
+      { studentId: 3, subjectId: 3, value: 12, max: 20, term: 'Trimestre 1' },
+    ];
+
+    const feeStructures = [
+      { id: 1, level: 'Primaire', amount: 500000, description: 'Frais annuels primaire' },
+      { id: 2, level: 'Collège', amount: 800000, description: 'Frais annuels collège' },
+      { id: 3, level: 'Lycée', amount: 1200000, description: 'Frais annuels lycée' },
+    ];
+
+    // ═══════════════════════════════════════════════════════════════
+    // ÉTAT
+    // ═══════════════════════════════════════════════════════════════
+    let currentTab = 'dashboard';
+    let selectedClass = null;
+    let showAddStudent = false;
+    let showAddGrade = false;
+    let showBulletin = false;
+    let selectedStudent = null;
+
+    // ═══════════════════════════════════════════════════════════════
+    // FONCTIONS
+    // ═══════════════════════════════════════════════════════════════
+    function formatCurrency(amount) {
+      return `${activeCurrency.symbol} ${new Intl.NumberFormat('fr-GN').format(amount)}`;
+    }
+
+    function getGradeClass(value) {
+      if (value >= 16) return 'grade-A';
+      if (value >= 12) return 'grade-B';
+      if (value >= 10) return 'grade-C';
+      return 'grade-D';
+    }
+
+    function calculateAverage(studentId) {
+      const studentGrades = grades.filter(g => g.studentId === studentId);
+      if (studentGrades.length === 0) return 0;
+      return (studentGrades.reduce((sum, g) => sum + g.value, 0) / studentGrades.length).toFixed(2);
+    }
+
+    function getTotalStudents() {
+      return classes.reduce((sum, c) => sum + c.students, 0);
+    }
+
+    function getFeesCollected() {
+      const paidStudents = students.filter(s => s.feesPaid).length;
+      const avgFee = feeStructures.reduce((s, f) => s + f.amount, 0) / feeStructures.length;
+      return paidStudents * avgFee;
+    }
+
+    function getFeesPending() {
+      const unpaidStudents = students.filter(s => !s.feesPaid).length;
+      const avgFee = feeStructures.reduce((s, f) => s + f.amount, 0) / feeStructures.length;
+      return unpaidStudents * avgFee;
+    }
+
+    function printBulletin(student) {
+      selectedStudent = student;
+      showBulletin = true;
+      render();
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // RENDU
+    // ═══════════════════════════════════════════════════════════════
+    function render() {
+      const app = document.getElementById('app');
+
+      app.innerHTML = `
+        <div class="min-h-screen flex">
+          <!-- Sidebar -->
+          <aside class="w-64 bg-gradient-to-b from-indigo-700 to-indigo-800 text-white flex flex-col">
+            <div class="p-4 border-b border-indigo-600">
+              <h1 class="text-xl font-bold flex items-center gap-2">
+                🏫 SchoolFlow
+              </h1>
+              <p class="text-xs text-indigo-300 mt-1">Gestion Scolaire Guinée</p>
+            </div>
+            
+            <nav class="flex-1 p-3">
+              ${[
+                { id: 'dashboard', icon: '📊', label: 'Tableau de bord' },
+                { id: 'students', icon: '👨‍🎓', label: 'Élèves' },
+                { id: 'classes', icon: '📚', label: 'Classes' },
+                { id: 'grades', icon: '📝', label: 'Notes' },
+                { id: 'fees', icon: '💰', label: 'Frais scolaires' },
+                { id: 'reports', icon: '📈', label: 'Bulletins' },
+              ].map(tab => `
+                <button onclick="currentTab = '${tab.id}'; render()"
+                  class="w-full flex items-center gap-3 px-4 py-3 rounded-lg mb-1 transition
+                    ${currentTab === tab.id ? 'bg-white/20 text-white' : 'text-indigo-200 hover:bg-white/10'}">
+                  <span class="text-lg">${tab.icon}</span>
+                  <span class="text-sm">${tab.label}</span>
+                </button>
+              `).join('')}
+            </nav>
+
+            <div class="p-4 border-t border-indigo-600">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center">
+                  AD
+                </div>
+                <div>
+                  <div class="text-sm font-medium">Admin</div>
+                  <div class="text-xs text-indigo-300">École Primaire</div>
+                </div>
+              </div>
+            </div>
+          </aside>
+
+          <!-- Main Content -->
+          <main class="flex-1 p-6 overflow-auto">
+            <!-- Dashboard -->
+            ${currentTab === 'dashboard' ? `
+              <div>
+                <h2 class="text-2xl font-bold mb-6">Tableau de bord</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                  <div class="bg-white rounded-xl p-5 shadow-sm border">
+                    <div class="flex items-center justify-between mb-3">
+                      <span class="text-3xl">👨‍🎓</span>
+                      <span class="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded-full">Total</span>
+                    </div>
+                    <div class="text-3xl font-bold">${getTotalStudents()}</div>
+                    <div class="text-sm text-gray-500">Élèves inscrits</div>
+                  </div>
+                  
+                  <div class="bg-white rounded-xl p-5 shadow-sm border">
+                    <div class="flex items-center justify-between mb-3">
+                      <span class="text-3xl">📚</span>
+                      <span class="text-xs bg-indigo-100 text-indigo-600 px-2 py-1 rounded-full">Classes</span>
+                    </div>
+                    <div class="text-3xl font-bold">${classes.length}</div>
+                    <div class="text-sm text-gray-500">Classes actives</div>
+                  </div>
+                  
+                  <div class="bg-white rounded-xl p-5 shadow-sm border">
+                    <div class="flex items-center justify-between mb-3">
+                      <span class="text-3xl">💰</span>
+                      <span class="text-xs bg-green-100 text-green-600 px-2 py-1 rounded-full">Payé</span>
+                    </div>
+                    <div class="text-2xl font-bold text-green-600">${formatCurrency(getFeesCollected())}</div>
+                    <div class="text-sm text-gray-500">Frais collectés</div>
+                  </div>
+                  
+                  <div class="bg-white rounded-xl p-5 shadow-sm border">
+                    <div class="flex items-center justify-between mb-3">
+                      <span class="text-3xl">⏳</span>
+                      <span class="text-xs bg-orange-100 text-orange-600 px-2 py-1 rounded-full">En attente</span>
+                    </div>
+                    <div class="text-2xl font-bold text-orange-600">${formatCurrency(getFeesPending())}</div>
+                    <div class="text-sm text-gray-500">Frais en attente</div>
+                  </div>
+                </div>
+
+                <!-- Recent Students -->
+                <div class="bg-white rounded-xl shadow-sm border">
+                  <div class="p-4 border-b flex justify-between items-center">
+                    <h3 class="font-semibold">Élèves récents</h3>
+                    <button onclick="currentTab = 'students'; render()" class="text-sm text-indigo-600 hover:underline">
+                      Voir tout →
+                    </button>
+                  </div>
+                  <div class="divide-y">
+                    ${students.slice(0, 5).map(s => `
+                      <div class="p-4 flex items-center justify-between hover:bg-gray-50">
+                        <div class="flex items-center gap-3">
+                          <div class="w-10 h-10 rounded-full flex items-center justify-center
+                            ${s.gender === 'M' ? 'bg-blue-100 text-blue-600' : 'bg-pink-100 text-pink-600'}">
+                            ${s.gender === 'M' ? '👨' : '👩'}
+                          </div>
+                          <div>
+                            <div class="font-medium">${s.firstName} ${s.lastName}</div>
+                            <div class="text-sm text-gray-500">${s.class} • ${s.age} ans</div>
+                          </div>
+                        </div>
+                        <span class="px-2 py-1 rounded-full text-xs
+                          ${s.feesPaid ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}">
+                          ${s.feesPaid ? '✓ Payé' : '⏳ En attente'}
+                        </span>
+                      </div>
+                    `).join('')}
+                  </div>
+                </div>
+              </div>
+            ` : ''}
+
+            <!-- Students -->
+            ${currentTab === 'students' ? `
+              <div>
+                <div class="flex justify-between items-center mb-6">
+                  <h2 class="text-2xl font-bold">Élèves</h2>
+                  <button onclick="showAddStudent = true; render()" 
+                    class="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+                    <span>+</span> Nouvel élève
+                  </button>
+                </div>
+
+                <!-- Filters -->
+                <div class="flex gap-3 mb-4">
+                  <select onchange="selectedClass = this.value || null; render()" 
+                    class="px-3 py-2 border rounded-lg">
+                    <option value="">Toutes les classes</option>
+                    ${classes.map(c => `<option value="${c.name}" ${selectedClass === c.name ? 'selected' : ''}>${c.name}</option>`).join('')}
+                  </select>
+                  <select class="px-3 py-2 border rounded-lg">
+                    <option>Tous les statuts</option>
+                    <option>Frais payés</option>
+                    <option>Frais en attente</option>
+                  </select>
+                </div>
+
+                <!-- Students Table -->
+                <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+                  <table class="w-full text-sm">
+                    <thead class="bg-gray-50">
+                      <tr>
+                        <th class="px-4 py-3 text-left text-gray-500 font-medium">Élève</th>
+                        <th class="px-4 py-3 text-left text-gray-500 font-medium">Classe</th>
+                        <th class="px-4 py-3 text-center text-gray-500 font-medium">Âge</th>
+                        <th class="px-4 py-3 text-left text-gray-500 font-medium">Parent</th>
+                        <th class="px-4 py-3 text-center text-gray-500 font-medium">Moyenne</th>
+                        <th class="px-4 py-3 text-center text-gray-500 font-medium">Frais</th>
+                        <th class="px-4 py-3 text-center text-gray-500 font-medium">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${students.filter(s => !selectedClass || s.class === selectedClass).map(s => `
+                        <tr class="border-t hover:bg-gray-50">
+                          <td class="px-4 py-3">
+                            <div class="flex items-center gap-3">
+                              <div class="w-8 h-8 rounded-full flex items-center justify-center
+                                ${s.gender === 'M' ? 'bg-blue-100' : 'bg-pink-100'}">
+                                ${s.gender === 'M' ? '👨' : '👩'}
+                              </div>
+                              <div>
+                                <div class="font-medium">${s.firstName} ${s.lastName}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td class="px-4 py-3">${s.class}</td>
+                          <td class="px-4 py-3 text-center">${s.age} ans</td>
+                          <td class="px-4 py-3">
+                            <div class="text-sm">${s.parentPhone}</div>
+                          </td>
+                          <td class="px-4 py-3 text-center">
+                            <span class="px-2 py-1 rounded text-sm font-medium ${getGradeClass(calculateAverage(s.id))}">
+                              ${calculateAverage(s.id) || '-'}/20
+                            </span>
+                          </td>
+                          <td class="px-4 py-3 text-center">
+                            <span class="px-2 py-1 rounded-full text-xs
+                              ${s.feesPaid ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}">
+                              ${s.feesPaid ? '✓ Payé' : '⏳ En attente'}
+                            </span>
+                          </td>
+                          <td class="px-4 py-3">
+                            <div class="flex justify-center gap-1">
+                              <button onclick="printBulletin(students.find(st => st.id === ${s.id}))" 
+                                class="p-1 hover:bg-gray-100 rounded" title="Bulletin">📄</button>
+                              <button class="p-1 hover:bg-gray-100 rounded" title="Modifier">✏️</button>
+                            </div>
+                          </td>
+                        </tr>
+                      `).join('')}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ` : ''}
+
+            <!-- Classes -->
+            ${currentTab === 'classes' ? `
+              <div>
+                <h2 class="text-2xl font-bold mb-6">Classes</h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  ${classes.map(c => `
+                    <div class="bg-white rounded-xl p-5 shadow-sm border hover:shadow-md transition cursor-pointer">
+                      <div class="flex items-center justify-between mb-3">
+                        <span class="text-2xl">📚</span>
+                        <span class="text-xs px-2 py-1 rounded-full
+                          ${c.level === 'Primaire' ? 'bg-green-100 text-green-600' : ''}
+                          ${c.level === 'Collège' ? 'bg-blue-100 text-blue-600' : ''}
+                          ${c.level === 'Lycée' ? 'bg-purple-100 text-purple-600' : ''}
+                        ">
+                          ${c.level}
+                        </span>
+                      </div>
+                      <div class="text-xl font-bold">${c.name}</div>
+                      <div class="text-sm text-gray-500 mt-1">${c.students} élèves</div>
+                      <div class="mt-3 pt-3 border-t flex justify-between text-xs text-gray-400">
+                        <span>Moyenne classe</span>
+                        <span class="font-medium text-gray-600">12.5/20</span>
+                      </div>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            ` : ''}
+
+            <!-- Grades -->
+            ${currentTab === 'grades' ? `
+              <div>
+                <div class="flex justify-between items-center mb-6">
+                  <h2 class="text-2xl font-bold">Notes</h2>
+                  <button onclick="showAddGrade = true; render()" 
+                    class="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+                    <span>+</span> Ajouter une note
+                  </button>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+                  <table class="w-full text-sm">
+                    <thead class="bg-gray-50">
+                      <tr>
+                        <th class="px-4 py-3 text-left text-gray-500 font-medium">Élève</th>
+                        <th class="px-4 py-3 text-left text-gray-500 font-medium">Matière</th>
+                        <th class="px-4 py-3 text-center text-gray-500 font-medium">Note</th>
+                        <th class="px-4 py-3 text-center text-gray-500 font-medium">Coefficient</th>
+                        <th class="px-4 py-3 text-left text-gray-500 font-medium">Période</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${grades.map(g => {
+                        const student = students.find(s => s.id === g.studentId);
+                        const subject = subjects.find(s => s.id === g.subjectId);
+                        return `
+                          <tr class="border-t hover:bg-gray-50">
+                            <td class="px-4 py-3 font-medium">${student?.firstName} ${student?.lastName}</td>
+                            <td class="px-4 py-3">${subject?.name}</td>
+                            <td class="px-4 py-3 text-center">
+                              <span class="px-3 py-1 rounded-lg font-medium ${getGradeClass(g.value)}">
+                                ${g.value}/${g.max}
+                              </span>
+                            </td>
+                            <td class="px-4 py-3 text-center">${subject?.coefficient}</td>
+                            <td class="px-4 py-3">${g.term}</td>
+                          </tr>
+                        `;
+                      }).join('')}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ` : ''}
+
+            <!-- Fees -->
+            ${currentTab === 'fees' ? `
+              <div>
+                <h2 class="text-2xl font-bold mb-6">Frais scolaires</h2>
+
+                <!-- Fee Structure -->
+                <div class="bg-white rounded-xl shadow-sm border mb-6 p-6">
+                  <h3 class="font-semibold mb-4">Structure des frais ${new Date().getFullYear()}-${new Date().getFullYear() + 1}</h3>
+                  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    ${feeStructures.map(f => `
+                      <div class="border rounded-lg p-4 text-center">
+                        <div class="text-sm text-gray-500 mb-1">${f.level}</div>
+                        <div class="text-2xl font-bold text-indigo-600">${formatCurrency(f.amount)}</div>
+                        <div class="text-xs text-gray-400 mt-1">${f.description}</div>
+                      </div>
+                    `).join('')}
+                  </div>
+                </div>
+
+                <!-- Payment Status -->
+                <div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+                  <div class="p-4 border-b">
+                    <h3 class="font-semibold">Statut des paiements</h3>
+                  </div>
+                  <table class="w-full text-sm">
+                    <thead class="bg-gray-50">
+                      <tr>
+                        <th class="px-4 py-3 text-left text-gray-500 font-medium">Élève</th>
+                        <th class="px-4 py-3 text-left text-gray-500 font-medium">Classe</th>
+                        <th class="px-4 py-3 text-right text-gray-500 font-medium">Montant dû</th>
+                        <th class="px-4 py-3 text-center text-gray-500 font-medium">Statut</th>
+                        <th class="px-4 py-3 text-center text-gray-500 font-medium">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${students.map(s => {
+                        const fee = feeStructures.find(f => {
+                          if (s.class.includes('CP') || s.class.includes('CE') || s.class.includes('CM')) return f.level === 'Primaire';
+                          if (s.class.includes('ème')) return f.level === 'Collège';
+                          return f.level === 'Lycée';
+                        });
+                        return `
+                          <tr class="border-t hover:bg-gray-50">
+                            <td class="px-4 py-3 font-medium">${s.firstName} ${s.lastName}</td>
+                            <td class="px-4 py-3">${s.class}</td>
+                            <td class="px-4 py-3 text-right font-medium">${formatCurrency(fee?.amount || 0)}</td>
+                            <td class="px-4 py-3 text-center">
+                              <span class="px-2 py-1 rounded-full text-xs
+                                ${s.feesPaid ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}">
+                                ${s.feesPaid ? '✓ Payé' : '⏳ En attente'}
+                              </span>
+                            </td>
+                            <td class="px-4 py-3 text-center">
+                              ${!s.feesPaid ? `
+                                <button class="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700">
+                                  Encaisser
+                                </button>
+                              ` : '-'}
+                            </td>
+                          </tr>
+                        `;
+                      }).join('')}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ` : ''}
+
+            <!-- Reports -->
+            ${currentTab === 'reports' ? `
+              <div>
+                <h2 class="text-2xl font-bold mb-6">Bulletins scolaires</h2>
+                
+                <div class="bg-white rounded-xl shadow-sm border p-6">
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div>
+                      <label class="block text-sm text-gray-500 mb-1">Classe</label>
+                      <select class="w-full px-3 py-2 border rounded-lg">
+                        <option>Toutes les classes</option>
+                        ${classes.map(c => `<option>${c.name}</option>`).join('')}
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-sm text-gray-500 mb-1">Trimestre</label>
+                      <select class="w-full px-3 py-2 border rounded-lg">
+                        <option>Trimestre 1</option>
+                        <option>Trimestre 2</option>
+                        <option>Trimestre 3</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <h4 class="font-medium mb-3">Générer les bulletins</h4>
+                  <div class="flex gap-3">
+                    <button onclick="alert('Bulletins générés avec succès!')" 
+                      class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+                      📄 Générer tous les bulletins
+                    </button>
+                    <button class="px-4 py-2 border rounded-lg hover:bg-gray-50">
+                      📊 Exporter en Excel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ` : ''}
+          </main>
+        </div>
+
+        <!-- Bulletin Modal -->
+        ${showBulletin && selectedStudent ? `
+          <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-xl w-full max-w-2xl max-h-[90vh] overflow-auto shadow-2xl">
+              <div class="sticky top-0 bg-white border-b px-4 py-3 flex justify-between items-center">
+                <h3 class="font-semibold">Bulletin de ${selectedStudent.firstName} ${selectedStudent.lastName}</h3>
+                <button onclick="showBulletin = false; render()" class="text-gray-400 hover:text-gray-600">✕</button>
+              </div>
+              
+              <div class="p-6" id="bulletin">
+                <!-- Header -->
+                <div class="text-center border-b pb-4 mb-4">
+                  <h2 class="text-xl font-bold">🎓 École Primaire de Conakry</h2>
+                  <p class="text-sm text-gray-500">Année scolaire 2024-2025</p>
+                  <p class="text-lg font-semibold mt-2">BULLETIN DE NOTES - Trimestre 1</p>
+                </div>
+
+                <!-- Student Info -->
+                <div class="bg-gray-50 rounded-lg p-4 mb-4">
+                  <div class="grid grid-cols-2 gap-2 text-sm">
+                    <div><strong>Nom:</strong> ${selectedStudent.lastName}</div>
+                    <div><strong>Prénom:</strong> ${selectedStudent.firstName}</div>
+                    <div><strong>Classe:</strong> ${selectedStudent.class}</div>
+                    <div><strong>Âge:</strong> ${selectedStudent.age} ans</div>
+                  </div>
+                </div>
+
+                <!-- Grades Table -->
+                <table class="w-full text-sm mb-4">
+                  <thead class="bg-indigo-50">
+                    <tr>
+                      <th class="px-4 py-2 text-left">Matière</th>
+                      <th class="px-4 py-2 text-center">Coef.</th>
+                      <th class="px-4 py-2 text-center">Note /20</th>
+                      <th class="px-4 py-2 text-center">Appréciation</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${subjects.map(sub => {
+                      const grade = grades.find(g => g.studentId === selectedStudent.id && g.subjectId === sub.id);
+                      const note = grade?.value || Math.floor(Math.random() * 10) + 8;
+                      const appreciation = note >= 16 ? 'Très bien' : note >= 14 ? 'Bien' : note >= 12 ? 'Assez bien' : note >= 10 ? 'Passable' : 'Insuffisant';
+                      return `
+                        <tr class="border-b">
+                          <td class="px-4 py-2 font-medium">${sub.name}</td>
+                          <td class="px-4 py-2 text-center">${sub.coefficient}</td>
+                          <td class="px-4 py-2 text-center">
+                            <span class="px-2 py-1 rounded ${getGradeClass(note)}">${note}</span>
+                          </td>
+                          <td class="px-4 py-2 text-center text-sm">${appreciation}</td>
+                        </tr>
+                      `;
+                    }).join('')}
+                  </tbody>
+                  <tfoot class="bg-gray-50 font-semibold">
+                    <tr>
+                      <td class="px-4 py-2" colspan="2">Moyenne Générale</td>
+                      <td class="px-4 py-2 text-center">
+                        <span class="px-3 py-1 rounded-lg grade-B">${calculateAverage(selectedStudent.id) || '13.5'}/20</span>
+                      </td>
+                      <td class="px-4 py-2 text-center"></td>
+                    </tr>
+                  </tfoot>
+                </table>
+
+                <!-- Footer -->
+                <div class="grid grid-cols-2 gap-8 mt-8 pt-4 border-t">
+                  <div class="text-center">
+                    <div class="text-sm text-gray-500 mb-8">Signature du Directeur</div>
+                    <div class="border-t border-gray-400 pt-1 text-xs text-gray-500">Cachet</div>
+                  </div>
+                  <div class="text-center">
+                    <div class="text-sm text-gray-500 mb-8">Signature des Parents</div>
+                    <div class="border-t border-gray-400 pt-1 text-xs text-gray-500">Date</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Actions -->
+              <div class="sticky bottom-0 bg-white border-t p-4 flex gap-3 justify-end">
+                <button onclick="window.print()" class="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+                  🖨️ Imprimer
+                </button>
+                <button onclick="showBulletin = false; render()" class="px-4 py-2 border rounded-lg hover:bg-gray-50">
+                  Fermer
+                </button>
+              </div>
+            </div>
+          </div>
+        ` : ''}
+      `;
+    }
+
+    // Initial render
+    render();
+  </script>
+</body>
+</html>

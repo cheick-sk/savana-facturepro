@@ -1,0 +1,96 @@
+{% extends 'layouts/base.html' %}
+
+{% block content %}
+<!-- Success Badge -->
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 20px;">
+    <tr>
+        <td align="center">
+            <div style="width: 72px; height: 72px; background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%); border-radius: 50%; display: inline-block; text-align: center; line-height: 72px;">
+                <span style="font-size: 36px;">✓</span>
+            </div>
+        </td>
+    </tr>
+    <tr>
+        <td align="center" style="padding-top: 16px;">
+            <h1 style="margin: 0; font-size: 24px; font-weight: 700; color: #15803d;">
+                Payment Confirmed!
+            </h1>
+        </td>
+    </tr>
+</table>
+
+<!-- Greeting -->
+<p style="margin: 0 0 16px 0; font-size: 16px; color: #374151; text-align: center;">
+    Hello <strong>{{ customer_name }}</strong>,
+</p>
+
+<!-- Main message -->
+<p style="margin: 0 0 20px 0; font-size: 15px; color: #4b5563; line-height: 1.6; text-align: center;">
+    We confirm receipt of your payment for invoice 
+    <strong style="color: #1a56db;">{{ invoice_number }}</strong>.
+</p>
+
+<!-- Amount Box -->
+{% set amount_label = 'Amount Paid' %}
+{% include 'partials/amount_box.html' %}
+
+<!-- Payment Details -->
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 25px 0; border: 1px solid #e5e7eb; border-radius: 8px;">
+    <tr style="background-color: #f9fafb;">
+        <td style="padding: 12px 20px; font-size: 13px; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb;">
+            Payment Details
+        </td>
+    </tr>
+    <tr>
+        <td style="padding: 16px 20px;">
+            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                    <td style="padding: 6px 0; font-size: 14px; color: #6b7280;">Invoice Number</td>
+                    <td align="right" style="padding: 6px 0; font-size: 14px; color: #374151;">{{ invoice_number }}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 6px 0; font-size: 14px; color: #6b7280;">Payment Date</td>
+                    <td align="right" style="padding: 6px 0; font-size: 14px; color: #374151;">{{ payment_date }}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 6px 0; font-size: 14px; color: #6b7280;">Payment Method</td>
+                    <td align="right" style="padding: 6px 0; font-size: 14px; color: #374151;">{{ payment_method }}</td>
+                </tr>
+                {% if transaction_id %}
+                <tr>
+                    <td style="padding: 6px 0; font-size: 14px; color: #6b7280;">Reference</td>
+                    <td align="right" style="padding: 6px 0; font-size: 14px; font-family: monospace; color: #374151;">{{ transaction_id }}</td>
+                </tr>
+                {% endif %}
+            </table>
+        </td>
+    </tr>
+</table>
+
+<!-- Receipt Download -->
+{% if receipt_url %}
+{% set button_text = 'Download Receipt' %}
+{% set button_url = receipt_url %}
+{% set button_align = 'center' %}
+{% include 'partials/button.html' %}
+{% endif %}
+
+<!-- Thank you -->
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 25px 0; background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border-radius: 8px;">
+    <tr>
+        <td style="padding: 20px; text-align: center;">
+            <p style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600; color: #1e40af;">
+                Thank you for your business!
+            </p>
+            <p style="margin: 0; font-size: 14px; color: #1d4ed8;">
+                We're here if you need anything.
+            </p>
+        </td>
+    </tr>
+</table>
+
+<!-- Support -->
+<p style="margin: 20px 0 0 0; font-size: 14px; color: #6b7280; line-height: 1.6; text-align: center;">
+    Questions? <a href="mailto:{{ support_email | default('support@savana.africa') }}" style="color: #1a56db; text-decoration: none;">Contact Support</a>
+</p>
+{% endblock %}

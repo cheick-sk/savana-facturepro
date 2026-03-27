@@ -1,0 +1,112 @@
+{% extends 'layouts/base.html' %}
+
+{% block content %}
+<!-- Reminder Badge -->
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin-bottom: 20px;">
+    <tr>
+        <td align="center">
+            <span style="display: inline-block; background: {% if is_overdue %}#fef2f2{% else %}#fef3c7{% endif %}; color: {% if is_overdue %}#dc2626{% else %}#b45309{% endif %}; font-size: 13px; font-weight: 600; padding: 8px 16px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px;">
+                {% if is_overdue %}⚠️ Payment Overdue{% else %}⏰ Payment Reminder{% endif %}
+            </span>
+        </td>
+    </tr>
+</table>
+
+<!-- Greeting -->
+<p style="margin: 0 0 16px 0; font-size: 16px; color: #374151;">
+    Hello <strong>{{ customer_name }}</strong>,
+</p>
+
+<!-- Main message -->
+<p style="margin: 0 0 20px 0; font-size: 15px; color: #4b5563; line-height: 1.6;">
+    {% if is_overdue %}
+    This is a reminder that invoice <strong style="color: #dc2626;">{{ invoice_number }}</strong>
+    is <strong>{{ days_overdue }} day(s)</strong> overdue. Please settle this amount as soon as possible.
+    {% else %}
+    This is a friendly reminder that invoice <strong style="color: #1a56db;">{{ invoice_number }}</strong>
+    is due on <strong>{{ due_date }}</strong>.
+    {% endif %}
+</p>
+
+<!-- Amount Box -->
+{% set amount_label = 'Amount Due' %}
+{% set bg_color = '#fef2f2' if is_overdue else '#f0fdf4' %}
+{% set border_color = '#dc2626' if is_overdue else '#22c55e' %}
+{% include 'partials/amount_box.html' %}
+
+<!-- Invoice Details -->
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 20px 0; border: 1px solid #e5e7eb; border-radius: 8px;">
+    <tr style="background-color: #f9fafb;">
+        <td style="padding: 12px 20px; font-size: 13px; font-weight: 600; color: #374151; border-bottom: 1px solid #e5e7eb;">
+            Invoice Details
+        </td>
+    </tr>
+    <tr>
+        <td style="padding: 16px 20px;">
+            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                <tr>
+                    <td style="padding: 6px 0; font-size: 14px; color: #6b7280;">Invoice Number</td>
+                    <td align="right" style="padding: 6px 0; font-size: 14px; color: #374151;">{{ invoice_number }}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 6px 0; font-size: 14px; color: #6b7280;">Issue Date</td>
+                    <td align="right" style="padding: 6px 0; font-size: 14px; color: #374151;">{{ invoice_date }}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 6px 0; font-size: 14px; color: #6b7280;">Due Date</td>
+                    <td align="right" style="padding: 6px 0; font-size: 14px; color: {% if is_overdue %}#dc2626{% else %}#374151{% endif %}; {% if is_overdue %}font-weight: 600;{% endif %}">{{ due_date }}</td>
+                </tr>
+                {% if late_fee %}
+                <tr>
+                    <td style="padding: 6px 0; font-size: 14px; color: #dc2626;">Late Fee</td>
+                    <td align="right" style="padding: 6px 0; font-size: 14px; color: #dc2626; font-weight: 600;">+{{ late_fee }} {{ currency }}</td>
+                </tr>
+                {% endif %}
+            </table>
+        </td>
+    </tr>
+</table>
+
+<!-- Payment Button -->
+{% if payment_link %}
+{% set button_text = 'Pay Now' %}
+{% set button_url = payment_link %}
+{% include 'partials/button.html' %}
+{% endif %}
+
+<!-- Payment Methods -->
+<table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 20px 0; background-color: #f9fafb; border-radius: 8px;">
+    <tr>
+        <td style="padding: 16px 20px;">
+            <p style="margin: 0 0 10px 0; font-size: 14px; font-weight: 600; color: #374151;">Accepted Payment Methods</p>
+            <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                    <td style="padding-right: 12px;">
+                        <span style="display: inline-block; background: #ff7900; color: white; font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 4px;">Orange Money</span>
+                    </td>
+                    <td style="padding-right: 12px;">
+                        <span style="display: inline-block; background: #ffcc00; color: #1a1a1a; font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 4px;">MTN MoMo</span>
+                    </td>
+                    <td style="padding-right: 12px;">
+                        <span style="display: inline-block; background: #00a3e0; color: white; font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 4px;">Wave</span>
+                    </td>
+                    <td>
+                        <span style="display: inline-block; background: #1a56db; color: white; font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 4px;">Card</span>
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+</table>
+
+<!-- Contact -->
+<p style="margin: 25px 0 0 0; font-size: 14px; color: #6b7280; line-height: 1.6;">
+    For any questions or if you've already made the payment, please contact us at 
+    <a href="mailto:{{ support_email | default('support@savana.africa') }}" style="color: #1a56db; text-decoration: none;">{{ support_email | default('support@savana.africa') }}</a>.
+</p>
+
+<p style="margin: 20px 0 0 0; font-size: 14px; color: #4b5563;">
+    Best regards,<br>
+    <strong style="color: #1a56db;">{{ company_name | default('Our Team') }}</strong>
+</p>
+{% endblock %}
