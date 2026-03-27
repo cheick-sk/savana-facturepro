@@ -26,5 +26,5 @@ ENV PYTHONPATH=/app
 # Expose the application port
 EXPOSE 8000
 
-# Run migrations then start server
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2"]
+# Run migrations, seed data, then start server
+CMD ["sh", "-c", "alembic upgrade head && python -m app.seeders && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2"]
