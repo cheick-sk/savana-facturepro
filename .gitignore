@@ -43,7 +43,8 @@ local-*
 .claude
 .z-ai-config
 dev.log
-test
+# test directories should NOT be ignored - only coverage
+# test source files should be committed
 prompt
 
 server.log
