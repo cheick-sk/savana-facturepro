@@ -12,9 +12,10 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
-    DATABASE_URL: str = "postgresql+asyncpg://savanaflow_user:savanaflow_pass@localhost:5434/savanaflow"
+    # Docker-aware database URL (uses container name)
+    DATABASE_URL: str = "postgresql+asyncpg://savanaflow_user:savanaflow_dev_password@postgres_savanaflow:5432/savanaflow"
 
-    SMTP_HOST: str = "localhost"
+    SMTP_HOST: str = "mailhog"
     SMTP_PORT: int = 1025
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
@@ -27,12 +28,12 @@ class Settings(BaseSettings):
     ADMIN_LAST_NAME: str = "POS"
 
     LOG_LEVEL: str = "INFO"
-    CORS_ORIGINS: str = "http://localhost:3003,http://savanaflow.localhost"
+    CORS_ORIGINS: str = "http://localhost:3002,http://localhost:8002,http://savanaflow.localhost"
     LOW_STOCK_THRESHOLD: int = 10
 
-    # Redis & Celery Configuration
-    REDIS_URL: str = "redis://localhost:6379/1"
-    CELERY_BROKER: str = "redis://localhost:6379/1"
+    # Redis & Celery Configuration (Docker-aware)
+    REDIS_URL: str = "redis://:redis_dev_password@redis:6379/1"
+    CELERY_BROKER: str = "redis://:redis_dev_password@redis:6379/1"
 
     # Rate Limiting
     RATE_LIMIT_REQUESTS: int = 100
@@ -49,4 +50,4 @@ def get_settings() -> Settings:
 
 
 # Global settings instance for Celery and other modules
-settings = Settings()
+settings = get_settings()

@@ -15,9 +15,10 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
-    DATABASE_URL: str = "postgresql+asyncpg://facturepro_user:facturepro_pass@localhost:5432/facturepro"
+    # Docker-aware database URL (uses container name)
+    DATABASE_URL: str = "postgresql+asyncpg://facturepro_user:facturepro_dev_password@postgres_facturepro:5432/facturepro"
 
-    SMTP_HOST: str = "localhost"
+    SMTP_HOST: str = "mailhog"
     SMTP_PORT: int = 1025
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
@@ -30,11 +31,11 @@ class Settings(BaseSettings):
     ADMIN_LAST_NAME: str = "System"
 
     LOG_LEVEL: str = "INFO"
-    CORS_ORIGINS: str = "http://localhost:3001,http://facturepro.localhost"
+    CORS_ORIGINS: str = "http://localhost:3001,http://localhost:8001,http://facturepro.localhost"
 
-    # Redis & Celery Configuration
-    REDIS_URL: str = "redis://localhost:6379/0"
-    CELERY_BROKER: str = "redis://localhost:6379/0"
+    # Redis & Celery Configuration (Docker-aware)
+    REDIS_URL: str = "redis://:redis_dev_password@redis:6379/0"
+    CELERY_BROKER: str = "redis://:redis_dev_password@redis:6379/0"
 
     # Rate Limiting
     RATE_LIMIT_REQUESTS: int = 100
