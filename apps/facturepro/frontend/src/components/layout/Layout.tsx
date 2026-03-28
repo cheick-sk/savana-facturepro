@@ -15,7 +15,9 @@ import {
   Building2,
   Receipt,
   TrendingUp,
-  HelpCircle
+  HelpCircle,
+  ShoppingBag,
+  Truck
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuthStore } from '../../store/auth'
@@ -37,6 +39,13 @@ const NAV_ITEMS = [
       { to: '/payments', icon: CreditCard, label: 'Paiements' },
       { to: '/expenses', icon: TrendingUp, label: 'Dépenses' },
       { to: '/reports', icon: Building2, label: 'Rapports' },
+    ]
+  },
+  {
+    section: 'Achats',
+    items: [
+      { to: '/purchase-orders', icon: ShoppingBag, label: 'Commandes fournisseur' },
+      { to: '/supplier-invoices', icon: Truck, label: 'Factures fournisseurs' },
     ]
   }
 ]

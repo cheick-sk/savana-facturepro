@@ -1,0 +1,335 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., 1.0.0)'
+        required: true
+        type: string
+      prerelease:
+        description: 'Is this a pre-release?'
+        required: true
+        default: false
+        type: boolean
+
+env:
+  REGISTRY: ghcr.io
+  PYTHON_VERSION: '3.11'
+  NODE_VERSION: '20'
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Prepare Release
+  # ─────────────────────────────────────────────────────────────────────────────
+  prepare:
+    name: Prepare Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+          echo "Release version: $VERSION"
+
+      - name: Validate version format
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
+            echo "Invalid version format: $VERSION"
+            echo "Expected format: X.Y.Z or X.Y.Z-prerelease"
+            exit 1
+          fi
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get the previous tag
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+
+          if [ -n "$PREV_TAG" ]; then
+            echo "Generating changelog from $PREV_TAG..."
+            git log $PREV_TAG..HEAD --pretty=format:"- %s (%h)" --no-merges > release_notes.md
+          else
+            echo "No previous tag found, generating full changelog..."
+            git log --pretty=format:"- %s (%h)" --no-merges -20 > release_notes.md
+          fi
+
+      - name: Upload changelog
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: release_notes.md
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Run Full Test Suite
+  # ─────────────────────────────────────────────────────────────────────────────
+  test:
+    name: Test Before Release
+    needs: [prepare]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        app: [facturepro, savanaflow, schoolflow]
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: apps/${{ matrix.app }}/backend/requirements.txt
+
+      - name: Install backend dependencies
+        working-directory: apps/${{ matrix.app }}/backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run backend tests
+        working-directory: apps/${{ matrix.app }}/backend
+        env:
+          DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/test_db
+          SECRET_KEY: release_test_key
+        run: pytest tests/ -v --tb=short
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: apps/${{ matrix.app }}/frontend/package-lock.json
+
+      - name: Build frontend
+        working-directory: apps/${{ matrix.app }}/frontend
+        run: |
+          npm ci --prefer-offline --no-audit
+          npm run build
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Build and Push Docker Images
+  # ─────────────────────────────────────────────────────────────────────────────
+  build:
+    name: Build Release Images
+    needs: [prepare, test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        app: [facturepro, savanaflow, schoolflow]
+        component: [backend, frontend]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.app }}-${{ matrix.component }}
+          tags: |
+            type=semver,pattern={{version}},value=${{ needs.prepare.outputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.prepare.outputs.version }}
+            type=semver,pattern={{major}},value=${{ needs.prepare.outputs.version }}
+            type=raw,value=latest
+          labels: |
+            org.opencontainers.image.version=${{ needs.prepare.outputs.version }}
+            org.opencontainers.image.title=${{ matrix.app }}-${{ matrix.component }}
+            org.opencontainers.image.description=Savana Africa SaaS - ${{ matrix.app }} ${{ matrix.component }}
+
+      - name: Build and push backend image
+        if: matrix.component == 'backend'
+        uses: docker/build-push-action@v5
+        with:
+          context: ./apps/${{ matrix.app }}/backend
+          file: ./apps/${{ matrix.app }}/backend/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            VERSION=${{ needs.prepare.outputs.version }}
+
+      - name: Build and push frontend image
+        if: matrix.component == 'frontend'
+        uses: docker/build-push-action@v5
+        with:
+          context: ./apps/${{ matrix.app }}/frontend
+          file: ./apps/${{ matrix.app }}/frontend/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            VITE_API_URL=${{ secrets.API_URL }}
+            VITE_APP_VERSION=${{ needs.prepare.outputs.version }}
+
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.app }}-${{ matrix.component }}:${{ needs.prepare.outputs.version }}
+          severity: 'CRITICAL,HIGH'
+          format: 'table'
+          exit-code: '0'
+        continue-on-error: true
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Create GitHub Release
+  # ─────────────────────────────────────────────────────────────────────────────
+  release:
+    name: Create Release
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download release notes
+        uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+
+      - name: Create release body
+        id: body
+        run: |
+          {
+            echo "## Release ${{ needs.prepare.outputs.version }}"
+            echo ""
+            echo "### Changes"
+            echo ""
+            cat release_notes.md
+            echo ""
+            echo "### Docker Images"
+            echo ""
+            echo "Images are available on GitHub Container Registry:"
+            echo "- \`ghcr.io/${{ github.repository_owner }}/facturepro-backend:${{ needs.prepare.outputs.version }}\`"
+            echo "- \`ghcr.io/${{ github.repository_owner }}/facturepro-frontend:${{ needs.prepare.outputs.version }}\`"
+            echo "- \`ghcr.io/${{ github.repository_owner }}/savanaflow-backend:${{ needs.prepare.outputs.version }}\`"
+            echo "- \`ghcr.io/${{ github.repository_owner }}/savanaflow-frontend:${{ needs.prepare.outputs.version }}\`"
+            echo "- \`ghcr.io/${{ github.repository_owner }}/schoolflow-backend:${{ needs.prepare.outputs.version }}\`"
+            echo "- \`ghcr.io/${{ github.repository_owner }}/schoolflow-frontend:${{ needs.prepare.outputs.version }}\`"
+          } > release_body.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.prepare.outputs.tag }}
+          name: Release ${{ needs.prepare.outputs.version }}
+          body_path: release_body.md
+          draft: false
+          prerelease: ${{ github.event.inputs.prerelease == 'true' }}
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Notify Teams
+  # ─────────────────────────────────────────────────────────────────────────────
+  notify:
+    name: Notify Release
+    needs: [prepare, release]
+    runs-on: ubuntu-latest
+    if: success()
+    steps:
+      - name: Notify Slack
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          payload: |
+            {
+              "text": "New Release Published",
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "🚀 Release ${{ needs.prepare.outputs.version }}"
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Version:*\n${{ needs.prepare.outputs.version }}"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Released by:*\n${{ github.actor }}"
+                    }
+                  ]
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "View Release"
+                      },
+                      "url": "${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ needs.prepare.outputs.tag }}"
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_RELEASE }}
+        continue-on-error: true

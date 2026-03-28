@@ -6,6 +6,13 @@ from app.models.all_models import (
     Quote, QuoteItem, QuoteStatus, RecurringFrequency,
     RecurringInvoice, Supplier, User, UserRole,
 )
+from app.models.client_portal import (
+    ClientAccount, ClientView, ClientPaymentMethod,
+)
+from app.models.purchase import (
+    PurchaseReception, PurchaseReceptionItem,
+    SupplierInvoice, SupplierPayment,
+)
 
 __all__ = [
     "User", "UserRole",
@@ -18,6 +25,9 @@ __all__ = [
     "CreditNote", "CreditNoteItem",
     "ExpenseCategory", "Expense",
     "PurchaseOrder", "PurchaseOrderItem",
+    "PurchaseReception", "PurchaseReceptionItem",
+    "SupplierInvoice", "SupplierPayment",
     "RecurringInvoice", "RecurringFrequency",
     "AuditLog",
+    "ClientAccount", "ClientView", "ClientPaymentMethod",
 ]

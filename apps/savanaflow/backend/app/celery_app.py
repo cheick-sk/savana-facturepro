@@ -17,6 +17,7 @@ celery_app = Celery(
         "app.tasks.inventory",
         "app.tasks.reports",
         "app.tasks.sync",
+        "app.tasks.loyalty",
     ]
 )
 
@@ -51,6 +52,31 @@ celery_app.conf.update(
         "sync-offline-sales": {
             "task": "app.tasks.sync.sync_offline_sales",
             "schedule": crontab(minute="*/5"),
+        },
+        # Loyalty: Process birthday bonuses daily at midnight
+        "loyalty-birthday-bonuses": {
+            "task": "app.tasks.loyalty.process_birthday_bonuses",
+            "schedule": crontab(hour=0, minute=5),
+        },
+        # Loyalty: Check tier upgrades daily at 1 AM
+        "loyalty-tier-upgrades": {
+            "task": "app.tasks.loyalty.check_tier_upgrades",
+            "schedule": crontab(hour=1, minute=0),
+        },
+        # Loyalty: Expire unused points daily at 2 AM
+        "loyalty-expire-points": {
+            "task": "app.tasks.loyalty.expire_unused_points",
+            "schedule": crontab(hour=2, minute=0),
+        },
+        # Loyalty: Expire vouchers hourly
+        "loyalty-expire-vouchers": {
+            "task": "app.tasks.loyalty.expire_vouchers",
+            "schedule": crontab(minute=0),
+        },
+        # Loyalty: Send tier upgrade notifications at 9 AM
+        "loyalty-tier-notifications": {
+            "task": "app.tasks.loyalty.send_tier_upgrade_notifications",
+            "schedule": crontab(hour=9, minute=0),
         },
     },
 )

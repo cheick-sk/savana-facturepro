@@ -2,11 +2,11 @@
 from __future__ import annotations
 
 import enum
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 
 from sqlalchemy import (
     BigInteger, Boolean, DateTime, ForeignKey,
-    Integer, Numeric, String, Text, JSON, UniqueConstraint,
+    Integer, Numeric, String, Text, JSON, UniqueConstraint, Date, Table, Column,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -63,6 +63,11 @@ class Store(Base):
     )
     transfers_to: Mapped[list["StoreTransfer"]] = relationship(
         back_populates="to_store", lazy="noload", foreign_keys="StoreTransfer.to_store_id"
+    )
+    employees: Mapped[list["Employee"]] = relationship(
+        secondary="employee_stores",
+        back_populates="assigned_stores",
+        lazy="noload"
     )
 
 
@@ -169,6 +174,7 @@ class POSCustomer(Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     phone: Mapped[str | None] = mapped_column(String(30), nullable=True, index=True)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    birthdate: Mapped[date | None] = mapped_column(Date, nullable=True)  # For birthday bonuses
     loyalty_points: Mapped[int] = mapped_column(Integer, default=0)
     loyalty_tier: Mapped[str] = mapped_column(String(20), default="STANDARD")  # STANDARD/SILVER/GOLD/PLATINUM
     total_spent: Mapped[float] = mapped_column(Numeric(14, 2), default=0.0)
@@ -177,6 +183,9 @@ class POSCustomer(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
     last_visit: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # Referral code for this customer
+    referral_code: Mapped[str | None] = mapped_column(String(20), unique=True, nullable=True, index=True)
 
     sales: Mapped[list["Sale"]] = relationship(back_populates="customer", lazy="noload")
     loyalty_transactions: Mapped[list["LoyaltyTransaction"]] = relationship(back_populates="customer", lazy="noload")
@@ -285,6 +294,7 @@ class Sale(Base):
     sale_number: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
     store_id: Mapped[int] = mapped_column(ForeignKey("stores.id"), nullable=False)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    employee_id: Mapped[int | None] = mapped_column(ForeignKey("employees.id"), nullable=True)
     shift_id: Mapped[int | None] = mapped_column(ForeignKey("shifts.id"), nullable=True)
     customer_id: Mapped[int | None] = mapped_column(ForeignKey("pos_customers.id"), nullable=True)
     promotion_id: Mapped[int | None] = mapped_column(ForeignKey("promotions.id"), nullable=True)
@@ -304,10 +314,12 @@ class Sale(Base):
 
     store: Mapped["Store"] = relationship(lazy="selectin")
     user: Mapped["User"] = relationship(lazy="selectin")
+    employee: Mapped["Employee | None"] = relationship(back_populates="sales", lazy="selectin")
     shift: Mapped["Shift | None"] = relationship(back_populates="sales", lazy="selectin")
     customer: Mapped["POSCustomer | None"] = relationship(back_populates="sales", lazy="selectin")
     items: Mapped[list["SaleItem"]] = relationship(back_populates="sale", lazy="selectin", cascade="all, delete-orphan")
     refunds: Mapped[list["Refund"]] = relationship(back_populates="sale", lazy="noload")
+    commissions: Mapped[list["EmployeeCommission"]] = relationship(back_populates="sale", lazy="noload")
 
 
 # ── SaleItem ───────────────────────────────────────────────────
@@ -454,3 +466,152 @@ class AuditLog(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 
     user: Mapped["User | None"] = relationship(back_populates="audit_logs")
+
+
+# ── Employee ───────────────────────────────────────────────────────
+class Employee(Base):
+    """Employé du commerce"""
+    __tablename__ = "employees"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)  # Link to user account
+    
+    first_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    last_name: Mapped[str] = mapped_column(String(100), nullable=False)
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    
+    employee_number: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
+    position: Mapped[str] = mapped_column(String(50), nullable=False)  # "vendeur", "caissier", "manager", "gerant"
+    
+    hire_date: Mapped[date] = mapped_column(Date, nullable=False)
+    termination_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    
+    # Access rights
+    can_void_sale: Mapped[bool] = mapped_column(Boolean, default=False)
+    can_refund: Mapped[bool] = mapped_column(Boolean, default=False)
+    can_apply_discount: Mapped[bool] = mapped_column(Boolean, default=False)
+    max_discount_percent: Mapped[float] = mapped_column(Numeric(5, 2), default=0)
+    can_open_close_shift: Mapped[bool] = mapped_column(Boolean, default=False)
+    can_manage_products: Mapped[bool] = mapped_column(Boolean, default=False)
+    can_view_reports: Mapped[bool] = mapped_column(Boolean, default=False)
+    can_manage_employees: Mapped[bool] = mapped_column(Boolean, default=False)
+    
+    # Commission settings
+    commission_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    commission_type: Mapped[str] = mapped_column(String(20), default="percent")  # "percent", "fixed"
+    commission_value: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
+    
+    # Salary info
+    base_salary: Mapped[float | None] = mapped_column(Numeric(14, 2), nullable=True)
+    salary_frequency: Mapped[str] = mapped_column(String(20), default="monthly")  # "daily", "weekly", "monthly"
+    
+    # Status
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    
+    # Stats
+    total_sales: Mapped[float] = mapped_column(Numeric(14, 2), default=0)
+    total_commission: Mapped[float] = mapped_column(Numeric(14, 2), default=0)
+    
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
+
+    # Relationships
+    user: Mapped["User | None"] = relationship(lazy="selectin")
+    assigned_stores: Mapped[list["Store"]] = relationship(
+        secondary="employee_stores",
+        back_populates="employees",
+        lazy="selectin"
+    )
+    sales: Mapped[list["Sale"]] = relationship(back_populates="employee", lazy="noload")
+    shift_records: Mapped[list["ShiftRecord"]] = relationship(back_populates="employee", lazy="noload")
+    commissions: Mapped[list["EmployeeCommission"]] = relationship(back_populates="employee", lazy="noload")
+    permissions: Mapped[list["EmployeePermission"]] = relationship(back_populates="employee", lazy="selectin", cascade="all, delete-orphan")
+
+    @property
+    def full_name(self) -> str:
+        return f"{self.first_name} {self.last_name}"
+
+
+class EmployeeStore(Base):
+    """Association employé-magasin"""
+    __tablename__ = "employee_stores"
+
+    employee_id: Mapped[int] = mapped_column(ForeignKey("employees.id"), primary_key=True)
+    store_id: Mapped[int] = mapped_column(ForeignKey("stores.id"), primary_key=True)
+    is_primary: Mapped[bool] = mapped_column(Boolean, default=False)  # Main store
+
+
+class ShiftRecord(Base):
+    """Enregistrement de shift employé"""
+    __tablename__ = "shift_records"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    employee_id: Mapped[int] = mapped_column(ForeignKey("employees.id"), nullable=False)
+    store_id: Mapped[int] = mapped_column(ForeignKey("stores.id"), nullable=False)
+    shift_id: Mapped[int | None] = mapped_column(ForeignKey("shifts.id"), nullable=True)
+    
+    # Times
+    clock_in: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    clock_out: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    
+    # Opening cash
+    opening_cash: Mapped[float | None] = mapped_column(Numeric(14, 2), nullable=True)
+    closing_cash: Mapped[float | None] = mapped_column(Numeric(14, 2), nullable=True)
+    cash_difference: Mapped[float] = mapped_column(Numeric(14, 2), default=0)
+    
+    # Statistics
+    sales_count: Mapped[int] = mapped_column(Integer, default=0)
+    sales_total: Mapped[float] = mapped_column(Numeric(14, 2), default=0)
+    refunds_count: Mapped[int] = mapped_column(Integer, default=0)
+    refunds_total: Mapped[float] = mapped_column(Numeric(14, 2), default=0)
+    
+    # Commission
+    commission_earned: Mapped[float] = mapped_column(Numeric(14, 2), default=0)
+    
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    
+    status: Mapped[str] = mapped_column(String(20), default="active")  # active, closed
+    
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+
+    employee: Mapped["Employee"] = relationship(back_populates="shift_records", lazy="selectin")
+    store: Mapped["Store"] = relationship(lazy="selectin")
+    shift: Mapped["Shift | None"] = relationship(lazy="selectin")
+
+
+class EmployeeCommission(Base):
+    """Commission calculée"""
+    __tablename__ = "employee_commissions"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    employee_id: Mapped[int] = mapped_column(ForeignKey("employees.id"), nullable=False)
+    shift_record_id: Mapped[int | None] = mapped_column(ForeignKey("shift_records.id"), nullable=True)
+    sale_id: Mapped[int | None] = mapped_column(ForeignKey("sales.id"), nullable=True)
+    
+    # Commission details
+    sale_amount: Mapped[float] = mapped_column(Numeric(14, 2), nullable=False)
+    commission_rate: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False)
+    commission_amount: Mapped[float] = mapped_column(Numeric(14, 2), nullable=False)
+    
+    # Payment status
+    is_paid: Mapped[bool] = mapped_column(Boolean, default=False)
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
+
+    employee: Mapped["Employee"] = relationship(back_populates="commissions", lazy="selectin")
+    shift_record: Mapped["ShiftRecord | None"] = relationship(lazy="selectin")
+    sale: Mapped["Sale | None"] = relationship(back_populates="commissions", lazy="selectin")
+
+
+class EmployeePermission(Base):
+    """Permission personnalisée"""
+    __tablename__ = "employee_permissions"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    employee_id: Mapped[int] = mapped_column(ForeignKey("employees.id", ondelete="CASCADE"), nullable=False)
+    permission: Mapped[str] = mapped_column(String(100), nullable=False)  # "pos.void", "pos.refund", "reports.view", etc.
+    is_granted: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    employee: Mapped["Employee"] = relationship(back_populates="permissions", lazy="selectin")

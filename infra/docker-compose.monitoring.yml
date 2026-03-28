@@ -1,0 +1,223 @@
+# Docker Compose override for monitoring services
+# Usage: docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
+#
+# This file adds:
+# - Prometheus: Metrics collection and alerting
+# - Grafana: Metrics visualization and dashboards
+# - Postgres Exporter: PostgreSQL metrics for all databases
+# - Redis Exporter: Redis metrics
+# - cAdvisor: Container metrics
+# - Node Exporter: Host system metrics
+
+services:
+  # ─────────────── PROMETHEUS ───────────────
+  prometheus:
+    image: prom/prometheus:v2.48.1
+    container_name: prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - africa_saas_network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "prometheus.io/scrape=true"
+      - "prometheus.io/port=9090"
+
+  # ─────────────── GRAFANA ───────────────
+  grafana:
+    image: grafana/grafana:10.2.3
+    container_name: grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=http://localhost:3000
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-piechart-panel
+      - GF_ALERTING_ENABLED=true
+      - GF_UNIFIED_ALERTING_ENABLED=true
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro
+    networks:
+      - africa_saas_network
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "prometheus.io/scrape=true"
+      - "prometheus.io/port=3000"
+      - "prometheus.io/path=/metrics"
+
+  # ─────────────── POSTGRES EXPORTER ───────────────
+  postgres_exporter_facturepro:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: postgres_exporter_facturepro
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: "postgresql://facturepro_user:facturepro_pass@postgres_facturepro:5432/facturepro?sslmode=disable"
+      PG_EXPORTER_DISABLE_DEFAULT_METRICS: "false"
+      PG_EXPORTER_DISABLE_SETTINGS_METRICS: "false"
+    ports:
+      - "9187:9187"
+    networks:
+      - africa_saas_network
+    depends_on:
+      postgres_facturepro:
+        condition: service_healthy
+    labels:
+      - "prometheus.io/scrape=true"
+      - "prometheus.io/port=9187"
+
+  postgres_exporter_schoolflow:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: postgres_exporter_schoolflow
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: "postgresql://schoolflow_user:schoolflow_pass@postgres_schoolflow:5432/schoolflow?sslmode=disable"
+      PG_EXPORTER_DISABLE_DEFAULT_METRICS: "false"
+      PG_EXPORTER_DISABLE_SETTINGS_METRICS: "false"
+    ports:
+      - "9188:9187"
+    networks:
+      - africa_saas_network
+    depends_on:
+      postgres_schoolflow:
+        condition: service_healthy
+    labels:
+      - "prometheus.io/scrape=true"
+      - "prometheus.io/port=9187"
+
+  postgres_exporter_savanaflow:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: postgres_exporter_savanaflow
+    restart: unless-stopped
+    environment:
+      DATA_SOURCE_NAME: "postgresql://savanaflow_user:savanaflow_pass@postgres_savanaflow:5432/savanaflow?sslmode=disable"
+      PG_EXPORTER_DISABLE_DEFAULT_METRICS: "false"
+      PG_EXPORTER_DISABLE_SETTINGS_METRICS: "false"
+    ports:
+      - "9189:9187"
+    networks:
+      - africa_saas_network
+    depends_on:
+      postgres_savanaflow:
+        condition: service_healthy
+    labels:
+      - "prometheus.io/scrape=true"
+      - "prometheus.io/port=9187"
+
+  # ─────────────── REDIS EXPORTER ───────────────
+  redis_exporter:
+    image: oliver006/redis_exporter:v1.55.0
+    container_name: redis_exporter
+    restart: unless-stopped
+    environment:
+      REDIS_ADDR: "redis://redis:6379"
+      REDIS_EXPORTER_DEBUG: "false"
+    ports:
+      - "9121:9121"
+    networks:
+      - africa_saas_network
+    depends_on:
+      redis:
+        condition: service_healthy
+    labels:
+      - "prometheus.io/scrape=true"
+      - "prometheus.io/port=9121"
+
+  # ─────────────── NODE EXPORTER (Host Metrics) ───────────────
+  node_exporter:
+    image: prom/node-exporter:v1.7.0
+    container_name: node_exporter
+    restart: unless-stopped
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    ports:
+      - "9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    networks:
+      - africa_saas_network
+    labels:
+      - "prometheus.io/scrape=true"
+      - "prometheus.io/port=9100"
+
+  # ─────────────── cADVISOR (Container Metrics) ───────────────
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.47.2
+    container_name: cadvisor
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    privileged: true
+    devices:
+      - /dev/kmsg
+    networks:
+      - africa_saas_network
+    labels:
+      - "prometheus.io/scrape=true"
+      - "prometheus.io/port=8080"
+
+  # ─────────────── ALERTMANAGER ───────────────
+  alertmanager:
+    image: prom/alertmanager:v0.26.0
+    container_name: alertmanager
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=http://localhost:9093'
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    networks:
+      - africa_saas_network
+    labels:
+      - "prometheus.io/scrape=true"
+      - "prometheus.io/port=9093"
+
+volumes:
+  prometheus_data:
+  grafana_data:
+  alertmanager_data:
+
+networks:
+  africa_saas_network:
+    external: true

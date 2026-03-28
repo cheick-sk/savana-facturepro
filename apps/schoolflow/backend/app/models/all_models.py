@@ -11,6 +11,11 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+from app.models.attendance import AttendanceSession, AttendanceRecord, AttendanceSettings
+from app.models.timetable import TimeSlot, TimetableEntry, TimetableConflict
+from app.models.parent_portal import (
+    ParentStudent, ParentAccount, ParentNotification, ParentMessage, ParentAccessToken
+)
 
 
 def now_utc() -> datetime:
@@ -32,6 +37,7 @@ class User(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
 
     audit_logs: Mapped[list["AuditLog"]] = relationship(back_populates="user", lazy="noload")
+    attendance_sessions: Mapped[list["AttendanceSession"]] = relationship(back_populates="created_by_user", lazy="noload")
 
     @property
     def full_name(self) -> str:
@@ -68,6 +74,7 @@ class Class(Base):
 
     students: Mapped[list["Student"]] = relationship(back_populates="class_", lazy="noload")
     subjects: Mapped[list["Subject"]] = relationship(back_populates="class_", lazy="noload")
+    attendance_sessions: Mapped[list["AttendanceSession"]] = relationship(back_populates="class_", lazy="noload")
 
 
 # ──────────────── Subject ────────────────
@@ -119,7 +126,23 @@ class Parent(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
 
+    # Legacy single student relationship (for backward compatibility)
     students: Mapped[list["Student"]] = relationship(back_populates="parent", lazy="noload")
+    
+    # New many-to-many relationship via ParentStudent
+    children: Mapped[list["Student"]] = relationship(
+        secondary="parent_students",
+        back_populates="parents",
+        lazy="selectin",
+        viewonly=True
+    )
+    
+    # Portal account
+    account: Mapped["ParentAccount | None"] = relationship(back_populates="parent", lazy="selectin", uselist=False)
+    
+    # Notifications and messages
+    notifications: Mapped[list["ParentNotification"]] = relationship(back_populates="parent", lazy="noload")
+    messages: Mapped[list["ParentMessage"]] = relationship(back_populates="parent", lazy="noload")
 
     @property
     def full_name(self) -> str:
@@ -146,6 +169,19 @@ class Student(Base):
     parent: Mapped["Parent | None"] = relationship(back_populates="students", lazy="selectin")
     grades: Mapped[list["Grade"]] = relationship(back_populates="student", lazy="noload")
     fee_invoices: Mapped[list["FeeInvoice"]] = relationship(back_populates="student", lazy="noload")
+    attendance_records: Mapped[list["AttendanceRecord"]] = relationship(back_populates="student", lazy="noload")
+    
+    # Many-to-many parents relationship
+    parents: Mapped[list["Parent"]] = relationship(
+        secondary="parent_students",
+        back_populates="children",
+        lazy="selectin",
+        viewonly=True
+    )
+    
+    # Portal notifications and messages
+    parent_notifications: Mapped[list["ParentNotification"]] = relationship(back_populates="student", lazy="noload")
+    parent_messages: Mapped[list["ParentMessage"]] = relationship(back_populates="student", lazy="noload")
 
     @property
     def full_name(self) -> str:

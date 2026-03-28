@@ -77,7 +77,9 @@
     "users": "Utilisateurs",
     "profile": "Mon profil",
     "help": "Aide",
-    "notifications": "Notifications"
+    "notifications": "Notifications",
+    "purchaseOrders": "Commandes fournisseur",
+    "supplierInvoices": "Factures fournisseurs"
   },
   "invoice": {
     "title": "Facture",
@@ -386,5 +388,161 @@
     "MA": "Maroc",
     "TN": "Tunisie",
     "CM": "Cameroun"
+  },
+  "portal": {
+    "title": "Portail Client",
+    "welcome": "Bienvenue sur votre portail client",
+    "dashboard": {
+      "title": "Tableau de bord",
+      "totalOutstanding": "Montant dû",
+      "totalPaid": "Total payé",
+      "overdueInvoices": "Factures en retard",
+      "pendingInvoices": "En attente",
+      "recentInvoices": "Factures récentes",
+      "recentPayments": "Paiements récents"
+    },
+    "invoices": {
+      "title": "Mes factures",
+      "viewInvoice": "Voir la facture",
+      "downloadPDF": "Télécharger PDF",
+      "payInvoice": "Payer",
+      "balanceDue": "Reste à payer",
+      "noInvoices": "Aucune facture"
+    },
+    "quotes": {
+      "title": "Mes devis",
+      "accept": "Accepter",
+      "reject": "Refuser",
+      "acceptConfirm": "Accepter ce devis ? Une facture sera générée automatiquement.",
+      "noQuotes": "Aucun devis"
+    },
+    "payments": {
+      "title": "Effectuer un paiement",
+      "amount": "Montant à payer",
+      "method": "Mode de paiement",
+      "mobileMoney": "Mobile Money",
+      "card": "Carte bancaire",
+      "phoneNumber": "Numéro de téléphone",
+      "operator": "Opérateur",
+      "processing": "Traitement en cours...",
+      "success": "Paiement réussi !",
+      "checkPhone": "Vérifiez votre téléphone pour confirmer le paiement"
+    },
+    "profile": {
+      "title": "Mon profil",
+      "personalInfo": "Informations personnelles",
+      "phone": "Téléphone",
+      "language": "Langue préférée",
+      "changePassword": "Changer le mot de passe",
+      "currentPassword": "Mot de passe actuel",
+      "newPassword": "Nouveau mot de passe",
+      "confirmPassword": "Confirmer le mot de passe",
+      "paymentMethods": "Méthodes de paiement sauvegardées",
+      "noPaymentMethods": "Aucune méthode de paiement sauvegardée"
+    },
+    "auth": {
+      "login": "Connexion",
+      "logout": "Déconnexion",
+      "magicLink": "Lien magique",
+      "password": "Mot de passe",
+      "sendMagicLink": "Envoyer le lien de connexion",
+      "magicLinkSent": "Lien de connexion envoyé ! Vérifiez votre boîte email.",
+      "checkEmail": "Vérifiez votre email",
+      "linkSentTo": "Un lien de connexion a été envoyé à"
+    },
+    "public": {
+      "invoiceNotFound": "Facture non trouvée ou lien expiré",
+      "invalidLink": "Lien invalide",
+      "expiredLink": "Ce lien est peut-être expiré ou invalide.",
+      "contactBusiness": "Contactez l'entreprise pour obtenir un nouveau lien."
+    },
+    "statement": {
+      "title": "Relevé de compte",
+      "period": "Période",
+      "openingBalance": "Solde d'ouverture",
+      "closingBalance": "Solde de clôture",
+      "totalInvoiced": "Total facturé",
+      "totalPaid": "Total payé"
+    }
+  },
+  "purchase": {
+    "orders": {
+      "title": "Bons de commande",
+      "create": "Nouvelle commande",
+      "edit": "Modifier la commande",
+      "number": "N° Commande",
+      "supplier": "Fournisseur",
+      "orderDate": "Date de commande",
+      "expectedDate": "Date de livraison prévue",
+      "receivedDate": "Date de réception",
+      "status": "Statut",
+      "total": "Total",
+      "send": "Envoyer au fournisseur",
+      "confirm": "Confirmer",
+      "cancel": "Annuler",
+      "receive": "Réceptionner",
+      "downloadPDF": "Télécharger PDF",
+      "statusLabels": {
+        "DRAFT": "Brouillon",
+        "SENT": "Envoyée",
+        "CONFIRMED": "Confirmée",
+        "PARTIAL": "Partielle",
+        "RECEIVED": "Reçue",
+        "CANCELLED": "Annulée"
+      }
+    },
+    "invoices": {
+      "title": "Factures fournisseurs",
+      "create": "Nouvelle facture",
+      "number": "N° Facture",
+      "supplier": "Fournisseur",
+      "invoiceDate": "Date de facture",
+      "dueDate": "Date d'échéance",
+      "status": "Statut",
+      "total": "Total",
+      "balance": "Reste à payer",
+      "pay": "Payer",
+      "statusLabels": {
+        "pending": "En attente",
+        "partially_paid": "Partiel",
+        "paid": "Payée",
+        "overdue": "En retard",
+        "cancelled": "Annulée"
+      }
+    },
+    "reception": {
+      "title": "Réception",
+      "create": "Créer une réception",
+      "number": "N° Réception",
+      "date": "Date de réception",
+      "status": "Statut",
+      "statusLabels": {
+        "partial": "Partielle",
+        "complete": "Complète"
+      }
+    },
+    "payment": {
+      "title": "Paiement fournisseur",
+      "record": "Enregistrer un paiement",
+      "amount": "Montant",
+      "method": "Mode de paiement",
+      "date": "Date",
+      "reference": "Référence",
+      "methods": {
+        "CASH": "Espèces",
+        "BANK_TRANSFER": "Virement bancaire",
+        "CHECK": "Chèque",
+        "MOBILE_MONEY": "Mobile Money"
+      }
+    },
+    "items": {
+      "product": "Produit",
+      "description": "Description",
+      "quantity": "Quantité",
+      "quantityReceived": "Qté reçue",
+      "unitPrice": "Prix unitaire",
+      "taxRate": "TVA %",
+      "lineTotal": "Total ligne"
+    }
   }
 }

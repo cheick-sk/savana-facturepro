@@ -2,11 +2,12 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { 
   Search, Trash2, Plus, Minus, CreditCard, Smartphone, Banknote, Check,
   ScanBarcode, Printer, Receipt, Globe, ChevronDown, X, User, AlertCircle,
-  DollarSign, ArrowRightLeft, Package
+  DollarSign, ArrowRightLeft, Package, Gift, Star
 } from 'lucide-react'
 import api from '../../lib/api'
 import { useCartStore } from '../../store/cart'
 import { useCurrencyStore } from '../../store/currency'
+import { useLoyaltyStore, type CardLookupResult } from '../../store/loyalty'
 import { CURRENCIES, formatCurrency, convertCurrency, type Currency } from '../../lib/currency'
 import { validateBarcode, generateEAN13, generateProductBarcode } from '../../lib/barcode'
 import { generateReceiptHTML, generateReceiptNumber, printReceipt, type ReceiptData } from '../../lib/receipt'
@@ -45,6 +46,11 @@ export default function POSPage() {
   const [customerSearch, setCustomerSearch] = useState('')
   const [customers, setCustomers] = useState<any[]>([])
   
+  // Loyalty
+  const [showLoyaltyScanner, setShowLoyaltyScanner] = useState(false)
+  const [loyaltyCardNumber, setLoyaltyCardNumber] = useState('')
+  const [loyaltyDiscount, setLoyaltyDiscount] = useState(0)
+  
   // Reçu
   const [showReceipt, setShowReceipt] = useState(false)
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null)
@@ -53,6 +59,16 @@ export default function POSPage() {
   const cart = useCartStore()
   const currencyStore = useCurrencyStore()
   const activeCurrency = currencyStore.activeCurrency
+  const { scannedCard, scannedCardLoading, lookupCard, clearScannedCard, earnPoints, redeemPoints } = useLoyaltyStore()
+
+  // Fonction pour réinitialiser la carte fidélité
+  const resetLoyalty = () => {
+    clearScannedCard()
+    setLoyaltyDiscount(0)
+  }
+
+  // Calcul du total avec remise fidélité
+  const totalWithLoyalty = Math.max(0, totalWithDiscount - loyaltyDiscount)
 
   // Charger les magasins
   useEffect(() => {
@@ -432,6 +448,19 @@ export default function POSPage() {
             Panier ({cart.items.length} article{cart.items.length !== 1 ? 's' : ''})
           </h2>
           <div className="flex items-center gap-2">
+            {/* Loyalty */}
+            <button
+              onClick={() => setShowLoyaltyScanner(true)}
+              className={`flex items-center gap-1 px-2 py-1 text-xs rounded-lg ${scannedCard ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}`}
+            >
+              <Gift size={14} />
+              {scannedCard ? (
+                <span className="flex items-center gap-1">
+                  <Star size={12} className="fill-current" />
+                  {scannedCard.points_balance}
+                </span>
+              ) : 'Fidélité'}
+            </button>
             {/* Client */}
             <button
               onClick={() => setShowCustomerSearch(true)}
@@ -447,6 +476,131 @@ export default function POSPage() {
             )}
           </div>
         </div>
+
+        {/* Modal Fidélité */}
+        {showLoyaltyScanner && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl w-full max-w-md p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <Gift size={20} className="text-purple-600" />
+                  Scanner carte fidélité
+                </h3>
+                <button onClick={() => { setShowLoyaltyScanner(false); }} className="p-1 hover:bg-gray-100 rounded">
+                  <X size={20} />
+                </button>
+              </div>
+              
+              <div className="relative mb-4">
+                <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Entrez le numéro de carte..."
+                  value={loyaltyCardNumber}
+                  onChange={(e) => setLoyaltyCardNumber(e.target.value.toUpperCase())}
+                  onKeyDown={async (e) => {
+                    if (e.key === 'Enter' && loyaltyCardNumber.trim()) {
+                      const result = await lookupCard(loyaltyCardNumber.trim())
+                      if (result) {
+                        setLoyaltyCardNumber('')
+                      }
+                    }
+                  }}
+                  className="w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 font-mono"
+                  autoFocus
+                />
+              </div>
+
+              <button
+                onClick={async () => {
+                  if (loyaltyCardNumber.trim()) {
+                    const result = await lookupCard(loyaltyCardNumber.trim())
+                    if (result) {
+                      setLoyaltyCardNumber('')
+                    }
+                  }
+                }}
+                disabled={scannedCardLoading || !loyaltyCardNumber.trim()}
+                className="w-full py-3 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {scannedCardLoading ? 'Recherche...' : 'Rechercher'}
+              </button>
+
+              {/* Card Result */}
+              {scannedCard && (
+                <div className="mt-4 p-4 bg-gray-50 rounded-xl space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="font-semibold text-gray-900">{scannedCard.customer_name}</div>
+                      <div className="text-sm text-gray-500">{scannedCard.customer_phone || 'Pas de téléphone'}</div>
+                    </div>
+                    <div 
+                      className="px-3 py-1 rounded-full text-sm font-medium"
+                      style={{ 
+                        backgroundColor: `${scannedCard.tier_color}20`,
+                        color: scannedCard.tier_color
+                      }}
+                    >
+                      {scannedCard.tier_name}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between p-3 bg-white rounded-lg border">
+                    <div className="flex items-center gap-2">
+                      <Star size={20} className="text-yellow-500 fill-yellow-500" />
+                      <span className="text-gray-600">Points disponibles</span>
+                    </div>
+                    <div className="text-2xl font-bold text-purple-600">{scannedCard.points_balance}</div>
+                  </div>
+
+                  {scannedCard.tier_discount_percent > 0 && (
+                    <div className="flex items-center justify-between text-sm p-2 bg-purple-50 rounded-lg">
+                      <span className="text-purple-600">Réduction {scannedCard.tier_name}</span>
+                      <span className="font-medium text-purple-700">-{scannedCard.tier_discount_percent}%</span>
+                    </div>
+                  )}
+
+                  {/* Redeem Points */}
+                  {scannedCard.can_redeem && totalWithDiscount > 0 && (
+                    <div className="pt-3 border-t">
+                      <div className="text-sm text-gray-600 mb-2">
+                        Utiliser des points (valeur: {scannedCard.points_value.toLocaleString('fr-FR')} GNF)
+                      </div>
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          min={0}
+                          max={Math.min(scannedCard.points_balance, Math.floor(totalWithDiscount * 0.5 / scannedCard.points_value))}
+                          placeholder="Points"
+                          className="flex-1 px-3 py-2 border rounded-lg text-sm"
+                          onChange={(e) => {
+                            const pts = parseInt(e.target.value) || 0
+                            const maxPts = Math.min(scannedCard.points_balance, Math.floor(totalWithDiscount * 0.5 / scannedCard.points_value))
+                            const validPts = Math.min(pts, maxPts)
+                            setLoyaltyDiscount(validPts * scannedCard.points_value)
+                          }}
+                        />
+                        <button
+                          onClick={() => setShowLoyaltyScanner(false)}
+                          className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm"
+                        >
+                          Appliquer
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <button 
+                    onClick={resetLoyalty}
+                    className="w-full text-sm text-red-600 hover:underline py-2"
+                  >
+                    Retirer la carte
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Modal recherche client */}
         {showCustomerSearch && (
@@ -552,9 +706,18 @@ export default function POSPage() {
               className="w-24 px-2 py-1 border rounded text-right text-sm"
             />
           </div>
+          {loyaltyDiscount > 0 && (
+            <div className="flex justify-between text-sm text-purple-600">
+              <span className="flex items-center gap-1">
+                <Gift size={14} />
+                Fidélité
+              </span>
+              <span>-{fmt(loyaltyDiscount, activeCurrency.code)}</span>
+            </div>
+          )}
           <div className="flex justify-between text-lg font-bold pt-2 border-t">
             <span>Total</span>
-            <span className="text-blue-600">{fmt(totalWithDiscount, activeCurrency.code)}</span>
+            <span className="text-blue-600">{fmt(totalWithLoyalty, activeCurrency.code)}</span>
           </div>
         </div>
 

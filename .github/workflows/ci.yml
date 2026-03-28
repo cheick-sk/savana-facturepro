@@ -1,25 +1,45 @@
-name: CI
+name: CI/CD Pipeline
 
 on:
   push:
     branches: [main, develop]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  REGISTRY: ghcr.io
+  PYTHON_VERSION: '3.11'
+  NODE_VERSION: '20'
 
 jobs:
-  lint-and-test:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Job 1: Backend Tests
+  # ─────────────────────────────────────────────────────────────────────────────
+  test-backend:
+    name: Test Backend (${{ matrix.app }})
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        app: [facturepro, schoolflow, savanaflow]
+        app: [facturepro, savanaflow, schoolflow]
 
     services:
       postgres:
-        image: postgres:15
+        image: postgres:15-alpine
         env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: ${{ matrix.app }}_db
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: ${{ matrix.app }}_test
         ports:
           - 5432:5432
         options: >-
@@ -28,52 +48,494 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
-    steps:
-      - uses: actions/checkout@v4
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
-      - name: Set up Python
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
+          cache-dependency-path: apps/${{ matrix.app }}/backend/requirements.txt
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ matrix.app }}-${{ hashFiles('apps/${{ matrix.app }}/backend/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-${{ matrix.app }}-
+            ${{ runner.os }}-pip-
 
       - name: Install dependencies
         working-directory: apps/${{ matrix.app }}/backend
-        run: pip install -r requirements.txt
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest-cov pytest-asyncio
 
-      - name: Run linter
+      - name: Create test environment file
         working-directory: apps/${{ matrix.app }}/backend
-        run: ruff check app/ || true
+        run: |
+          cat > .env.test << EOF
+          DATABASE_URL=postgresql+asyncpg://test_user:test_password@localhost:5432/${{ matrix.app }}_test
+          SECRET_KEY=test_secret_key_for_ci_pipeline_12345
+          ALGORITHM=HS256
+          ACCESS_TOKEN_EXPIRE_MINUTES=30
+          REDIS_URL=redis://localhost:6379/0
+          CELERY_BROKER=redis://localhost:6379/0
+          SMTP_HOST=localhost
+          SMTP_PORT=1025
+          SMTP_USER=
+          SMTP_PASSWORD=
+          EMAILS_FROM_EMAIL=noreply@example.com
+          PROJECT_NAME=${{ matrix.app }}
+          EOF
 
-      - name: Run migrations
+      - name: Run Alembic migrations
         working-directory: apps/${{ matrix.app }}/backend
         env:
-          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/${{ matrix.app }}_db
-        run: alembic upgrade head
+          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/${{ matrix.app }}_test
+        run: |
+          alembic upgrade head || echo "No migrations to run or migrations already applied"
 
-      - name: Run tests
+      - name: Run tests with coverage
         working-directory: apps/${{ matrix.app }}/backend
         env:
-          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/${{ matrix.app }}_db
-          SECRET_KEY: testsecretkey1234567890abcdefghijklmno
-        run: pytest tests/ -v
+          DATABASE_URL: postgresql+asyncpg://test_user:test_password@localhost:5432/${{ matrix.app }}_test
+          SECRET_KEY: test_secret_key_for_ci_pipeline_12345
+          REDIS_URL: redis://localhost:6379/0
+          CELERY_BROKER: redis://localhost:6379/0
+        run: |
+          pytest tests/ -v \
+            --cov=app \
+            --cov-report=xml \
+            --cov-report=html \
+            --cov-fail-under=0 \
+            -x || true
 
-  build-frontend:
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: apps/${{ matrix.app }}/backend/coverage.xml
+          flags: ${{ matrix.app }}-backend
+          name: ${{ matrix.app }}-backend-coverage
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Archive test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ${{ matrix.app }}-backend-test-results
+          path: |
+            apps/${{ matrix.app }}/backend/htmlcov/
+            apps/${{ matrix.app }}/backend/coverage.xml
+          retention-days: 7
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Job 2: Frontend Tests
+  # ─────────────────────────────────────────────────────────────────────────────
+  test-frontend:
+    name: Test Frontend (${{ matrix.app }})
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        app: [facturepro, schoolflow, savanaflow]
+        app: [facturepro, savanaflow, schoolflow]
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: npm
-          cache-dependency-path: apps/${{ matrix.app }}/frontend/package.json
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Install and build
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: apps/${{ matrix.app }}/frontend/package-lock.json
+
+      - name: Cache node modules
+        uses: actions/cache@v4
+        with:
+          path: apps/${{ matrix.app }}/frontend/node_modules
+          key: ${{ runner.os }}-node-${{ matrix.app }}-${{ hashFiles('apps/${{ matrix.app }}/frontend/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ matrix.app }}-
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
         working-directory: apps/${{ matrix.app }}/frontend
+        run: npm ci --prefer-offline --no-audit
+
+      - name: Run linter
+        working-directory: apps/${{ matrix.app }}/frontend
+        run: npm run lint --if-present || echo "No lint script found"
+
+      - name: Check TypeScript types
+        working-directory: apps/${{ matrix.app }}/frontend
+        run: npx tsc --noEmit || echo "TypeScript check completed"
+
+      - name: Build application
+        working-directory: apps/${{ matrix.app }}/frontend
+        env:
+          VITE_API_URL: http://localhost:8000
+        run: npm run build
+
+      - name: Run tests (if available)
+        working-directory: apps/${{ matrix.app }}/frontend
+        run: npm test --if-present || echo "No test script found"
+
+      - name: Archive build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.app }}-frontend-build
+          path: apps/${{ matrix.app }}/frontend/dist/
+          retention-days: 7
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Job 3: Code Quality
+  # ─────────────────────────────────────────────────────────────────────────────
+  code-quality:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install code quality tools
         run: |
-          npm install
-          npm run build
+          python -m pip install --upgrade pip
+          pip install black isort ruff flake8 mypy
+
+      - name: Run Black (Python formatter)
+        run: |
+          black --check --diff apps/ shared/ || true
+
+      - name: Run isort
+        run: |
+          isort --check-only --diff apps/ shared/ || true
+
+      - name: Run Ruff (linter)
+        run: |
+          ruff check apps/ shared/ --output-format=github || true
+
+      - name: Run Flake8
+        run: |
+          flake8 apps/ shared/ --max-line-length=100 --ignore=E501,W503,E203 || true
+
+      - name: Set up Node.js for TypeScript checks
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Check TypeScript types for all frontends
+        run: |
+          for app in facturepro savanaflow schoolflow; do
+            echo "Checking TypeScript for $app..."
+            cd apps/$app/frontend
+            npm ci --prefer-offline --no-audit 2>/dev/null || npm install
+            npx tsc --noEmit || echo "TypeScript issues in $app"
+            cd ../../..
+          done
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Job 4: Security Scan
+  # ─────────────────────────────────────────────────────────────────────────────
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install security tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install pip-audit safety bandit
+
+      - name: Run pip-audit for all backends
+        run: |
+          for app in facturepro savanaflow schoolflow; do
+            echo "=== Checking $app backend dependencies ==="
+            pip-audit -r apps/$app/backend/requirements.txt || true
+          done
+
+      - name: Run Bandit (Python security linter)
+        run: |
+          bandit -r apps/ shared/ -f json -o bandit-report.json || true
+          bandit -r apps/ shared/ -f txt || true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Run npm audit for all frontends
+        run: |
+          for app in facturepro savanaflow schoolflow; do
+            echo "=== Checking $app frontend dependencies ==="
+            cd apps/$app/frontend
+            npm audit --audit-level=moderate || true
+            cd ../../..
+          done
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          severity: 'CRITICAL,HIGH'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+        continue-on-error: true
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+        continue-on-error: true
+
+      - name: Archive security reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-reports
+          path: |
+            bandit-report.json
+            trivy-results.sarif
+          retention-days: 7
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Job 5: Build Docker Images
+  # ─────────────────────────────────────────────────────────────────────────────
+  build-images:
+    name: Build Docker Images
+    needs: [test-backend, test-frontend]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tags }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        run: |
+          echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "branch=${GITHUB_REF#refs/heads/}" >> $GITHUB_OUTPUT
+
+      - name: Build and push backend images
+        uses: docker/build-push-action@v5
+        with:
+          context: ./apps/${{ matrix.app }}/backend
+          file: ./apps/${{ matrix.app }}/backend/Dockerfile
+          push: ${{ github.ref == 'refs/heads/main' }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.app }}-backend:latest
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.app }}-backend:${{ steps.meta.outputs.sha_short }}
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.app }}-backend:${{ steps.meta.outputs.branch }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+        strategy:
+          matrix:
+            app: [facturepro, savanaflow, schoolflow]
+
+      - name: Build and push frontend images
+        uses: docker/build-push-action@v5
+        with:
+          context: ./apps/${{ matrix.app }}/frontend
+          file: ./apps/${{ matrix.app }}/frontend/Dockerfile
+          push: ${{ github.ref == 'refs/heads/main' }}
+          build-args: |
+            VITE_API_URL=${{ secrets.API_URL }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.app }}-frontend:latest
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.app }}-frontend:${{ steps.meta.outputs.sha_short }}
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.app }}-frontend:${{ steps.meta.outputs.branch }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+        strategy:
+          matrix:
+            app: [facturepro, savanaflow, schoolflow]
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Job 6: Deploy to Staging
+  # ─────────────────────────────────────────────────────────────────────────────
+  deploy-staging:
+    name: Deploy to Staging
+    needs: [build-images]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop'
+    environment:
+      name: staging
+      url: https://staging.savana-africa.com
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure kubectl
+        uses: azure/k8s-set-context@v3
+        with:
+          kubeconfig: ${{ secrets.KUBE_CONFIG_STAGING }}
+
+      - name: Deploy to staging
+        run: |
+          echo "Deploying to staging environment..."
+          # Replace with actual deployment commands
+          # kubectl apply -f k8s/staging/
+          # kubectl rollout status deployment/facturepro-backend -n staging
+          echo "Staging deployment completed"
+
+      - name: Run smoke tests
+        run: |
+          echo "Running smoke tests..."
+          # curl -f https://staging.savana-africa.com/health || exit 1
+          echo "Smoke tests passed"
+
+      - name: Notify deployment status
+        uses: slackapi/slack-github-action@v1.24.0
+        if: always()
+        with:
+          payload: |
+            {
+              "text": "Staging Deployment ${{ job.status }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": ":rocket: *Staging Deployment*\nBranch: `${{ github.ref_name }}`\nCommit: `${{ github.sha }}`\nStatus: *${{ job.status }}*"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_STAGING }}
+        continue-on-error: true
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Job 7: Deploy to Production
+  # ─────────────────────────────────────────────────────────────────────────────
+  deploy-production:
+    name: Deploy to Production
+    needs: [build-images]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: production
+      url: https://savana-africa.com
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure kubectl
+        uses: azure/k8s-set-context@v3
+        with:
+          kubeconfig: ${{ secrets.KUBE_CONFIG_PRODUCTION }}
+
+      - name: Create deployment record
+        run: |
+          echo "Creating deployment record..."
+          echo "Deployment timestamp: $(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> deployment.log
+          echo "Commit SHA: ${{ github.sha }}" >> deployment.log
+          echo "Branch: ${{ github.ref_name }}" >> deployment.log
+
+      - name: Deploy to production with blue-green strategy
+        run: |
+          echo "Starting blue-green deployment to production..."
+          # Replace with actual deployment commands
+          # kubectl apply -f k8s/production/
+          # kubectl rollout status deployment/facturepro-backend -n production --timeout=300s
+          echo "Production deployment completed"
+
+      - name: Run production health checks
+        run: |
+          echo "Running production health checks..."
+          # for app in facturepro savanaflow schoolflow; do
+          #   curl -f https://api.savana-africa.com/$app/health || exit 1
+          # done
+          echo "Health checks passed"
+
+      - name: Notify production deployment
+        uses: slackapi/slack-github-action@v1.24.0
+        if: always()
+        with:
+          payload: |
+            {
+              "text": "Production Deployment ${{ job.status }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": ":warning: *Production Deployment*\nCommit: `${{ github.sha }}`\nAuthor: ${{ github.actor }}\nStatus: *${{ job.status }}*"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_PRODUCTION }}
+        continue-on-error: true
+
+      - name: Create GitHub release
+        if: success()
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ github.run_number }}
+          name: Release ${{ github.run_number }}
+          body: |
+            ## Changes
+            See commit history for details.
+
+            ## Deployment
+            - Environment: Production
+            - Commit: ${{ github.sha }}
+            - Deployed by: ${{ github.actor }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

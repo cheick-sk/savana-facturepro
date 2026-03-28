@@ -5,7 +5,9 @@ from app.api.v1.endpoints import (
     auth, categories, customers, promotions,
     purchase_orders, products, refunds, reports,
     sales, shifts, stores, suppliers, transfers,
+    employees,
 )
+from app.api.v1.endpoints import loyalty
 
 api_router = APIRouter(prefix="/api/v1")
 
@@ -23,3 +25,9 @@ api_router.include_router(transfers.router)
 api_router.include_router(purchase_orders.router)
 api_router.include_router(reports.router)
 api_router.include_router(reports.dashboard_router)
+# Employee management
+api_router.include_router(employees.router)
+api_router.include_router(employees.shift_router)
+api_router.include_router(employees.commission_router)
+# Loyalty program
+api_router.include_router(loyalty.router)

@@ -10,6 +10,13 @@ import ProductsPage from './pages/products/ProductsPage'
 import StockPage from './pages/stock/StockPage'
 import ReportsPage from './pages/reports/ReportsPage'
 import StoresPage from './pages/dashboard/StoresPage'
+import AdvancedLoyaltyPage from './pages/loyalty/AdvancedLoyaltyPage'
+// Employee pages
+import EmployeesPage from './pages/employees/EmployeesPage'
+import EmployeeFormPage from './pages/employees/EmployeeFormPage'
+import EmployeeDetailPage from './pages/employees/EmployeeDetailPage'
+import ShiftsPage from './pages/employees/ShiftsPage'
+import CommissionPage from './pages/employees/CommissionPage'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const user = useAuthStore(s => s.user)
@@ -34,6 +41,14 @@ export default function App() {
           <Route path="stock" element={<StockPage />} />
           <Route path="reports" element={<ReportsPage />} />
           <Route path="stores" element={<StoresPage />} />
+          <Route path="loyalty" element={<AdvancedLoyaltyPage />} />
+          {/* Employee routes */}
+          <Route path="employees" element={<EmployeesPage />} />
+          <Route path="employees/new" element={<EmployeeFormPage />} />
+          <Route path="employees/:id" element={<EmployeeDetailPage />} />
+          <Route path="employees/:id/edit" element={<EmployeeFormPage />} />
+          <Route path="shifts" element={<ShiftsPage />} />
+          <Route path="commissions" element={<CommissionPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

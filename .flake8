@@ -1,0 +1,76 @@
+[flake8]
+# General settings
+max-line-length = 100
+max-complexity = 10
+
+# Exclude patterns
+exclude =
+    .git,
+    __pycache__,
+    .venv,
+    venv,
+    .env,
+    env,
+    node_modules,
+    dist,
+    build,
+    *.egg-info,
+    .eggs,
+    migrations,
+    alembic,
+    tests/fixtures,
+
+# Ignore specific errors
+# E501: Line too long (handled by black)
+# W503: Line break before binary operator (conflicts with black)
+# E203: Whitespace before ':' (conflicts with black)
+# E402: Module level import not at top of file
+# F401: Imported but unused (common in __init__.py)
+# F403: 'from module import *' used
+# F405: Name may be undefined, or defined from star imports
+# E722: Do not use bare except
+# B008: Do not perform function calls in argument defaults (FastAPI Depends)
+ignore =
+    E501,
+    W503,
+    E203,
+    E402,
+    F401,
+    F403,
+    F405,
+    E722,
+    B008,
+    C901,
+
+# Per-file ignores
+per-file-ignores =
+    # Allow unused imports in __init__.py
+    __init__.py: F401
+    # Allow star imports in test files
+    tests/*: F401, F403
+    # Allow assert in tests
+    tests/*: S101
+    # Allow imports after module docstring in migrations
+    migrations/*: E402
+
+# Enable flake8 extensions
+# Requires: pip install flake8-bugbear flake8-comprehensions flake8-docstrings
+# enable-extensions = G
+
+# Import order (requires flake8-import-order)
+# import-order-style = google
+
+# Docstring style
+docstring-convention = google
+
+# Radon McCabe complexity
+radon_max_cc = 10
+
+# Show source code for errors
+show_source = True
+
+# Show pep8 errors
+show_pep8_errors = True
+
+# Statistics
+statistics = True

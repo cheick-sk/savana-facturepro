@@ -4,6 +4,7 @@ from app.models.all_models import (
     PurchaseOrder, PurchaseOrderItem, Refund, RefundItem,
     Sale, SaleItem, Shift, StockMovement, Store,
     StoreTransfer, Supplier, TransferItem, User,
+    Employee, EmployeeStore, ShiftRecord, EmployeeCommission, EmployeePermission,
 )
 
 __all__ = [
@@ -19,4 +20,5 @@ __all__ = [
     "StoreTransfer", "TransferItem",
     "PurchaseOrder", "PurchaseOrderItem",
     "AuditLog",
+    "Employee", "EmployeeStore", "ShiftRecord", "EmployeeCommission", "EmployeePermission",
 ]

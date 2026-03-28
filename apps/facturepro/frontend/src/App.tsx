@@ -1,7 +1,8 @@
-import { useEffect } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import { useAuthStore } from './store/auth'
+import { usePortalAuthStore } from './store/portalAuth'
 import LoginPage from './pages/auth/LoginPage'
 import Layout from './components/layout/Layout'
 import DashboardPage from './pages/dashboard/DashboardPage'
@@ -10,6 +11,24 @@ import InvoicesPage from './pages/invoices/InvoicesPage'
 import InvoiceDetailPage from './pages/invoices/InvoiceDetailPage'
 import ProductsPage from './pages/products/ProductsPage'
 import PaymentsPage from './pages/payments/PaymentsPage'
+import QuotesPage from './pages/quotes/QuotesPage'
+import ExpensesPage from './pages/expenses/ExpensesPage'
+import ReportsPage from './pages/reports/ReportsPage'
+
+// Purchase pages
+import PurchaseOrdersPage from './pages/purchase/PurchaseOrdersPage'
+import SupplierInvoicesPage from './pages/purchase/SupplierInvoicesPage'
+
+// Portal imports
+import PortalLoginPage from './pages/portal/PortalLoginPage'
+import PortalLayout from './components/portal/PortalLayout'
+import PortalDashboardPage from './pages/portal/PortalDashboardPage'
+import PortalInvoicesPage from './pages/portal/PortalInvoicesPage'
+import PortalInvoiceDetailPage from './pages/portal/PortalInvoiceDetailPage'
+import PortalPaymentPage from './pages/portal/PortalPaymentPage'
+import PortalProfilePage from './pages/portal/PortalProfilePage'
+import PortalQuotesPage from './pages/portal/PortalQuotesPage'
+import PublicInvoicePage from './pages/portal/PublicInvoicePage'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const user = useAuthStore(s => s.user)
@@ -17,12 +36,149 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
-export default function App() {
-  const init = useAuthStore(s => s.init)
+function PortalRoutes() {
+  const { client, token, init, logout } = usePortalAuthStore()
+  const navigate = useNavigate()
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState<number | null>(null)
+  const [showPayment, setShowPayment] = useState(false)
 
   useEffect(() => {
     init()
   }, [init])
+
+  if (!client || !token) {
+    return <Navigate to="/portal/login" replace />
+  }
+
+  const handleLogout = () => {
+    logout()
+    navigate('/portal/login')
+  }
+
+  const handleViewInvoice = (id: number) => {
+    setSelectedInvoiceId(id)
+    setShowPayment(false)
+    navigate('/portal/invoices')
+  }
+
+  const handlePayInvoice = (id: number) => {
+    setSelectedInvoiceId(id)
+    setShowPayment(true)
+    navigate('/portal/invoices')
+  }
+
+  const handleBack = () => {
+    setSelectedInvoiceId(null)
+    setShowPayment(false)
+  }
+
+  return (
+    <PortalLayout clientName={client.customer?.name || client.email} onLogout={handleLogout}>
+      <PortalRouter
+        token={token}
+        selectedInvoiceId={selectedInvoiceId}
+        showPayment={showPayment}
+        onViewInvoice={handleViewInvoice}
+        onPayInvoice={handlePayInvoice}
+        onBack={handleBack}
+        setShowPayment={setShowPayment}
+        setSelectedInvoiceId={setSelectedInvoiceId}
+      />
+    </PortalLayout>
+  )
+}
+
+interface PortalRouterProps {
+  token: string
+  selectedInvoiceId: number | null
+  showPayment: boolean
+  onViewInvoice: (id: number) => void
+  onPayInvoice: (id: number) => void
+  onBack: () => void
+  setShowPayment: (show: boolean) => void
+  setSelectedInvoiceId: (id: number | null) => void
+}
+
+function PortalRouter({
+  token,
+  selectedInvoiceId,
+  showPayment,
+  onViewInvoice,
+  onPayInvoice,
+  onBack,
+  setShowPayment,
+}: PortalRouterProps) {
+  const location = useLocation()
+
+  // Render based on current route
+  if (location.pathname === '/portal') {
+    return <PortalDashboardPage token={token} onViewInvoice={onViewInvoice} />
+  }
+
+  if (location.pathname === '/portal/invoices') {
+    if (showPayment && selectedInvoiceId) {
+      return (
+        <PortalPaymentPage
+          token={token}
+          invoice={{
+            id: selectedInvoiceId,
+            invoice_number: '',
+            total_amount: 0,
+            amount_paid: 0,
+            balance_due: 0,
+            currency: 'XOF',
+          }}
+          onSuccess={onBack}
+          onCancel={onBack}
+        />
+      )
+    }
+    if (selectedInvoiceId) {
+      return (
+        <PortalInvoiceDetailPage
+          token={token}
+          invoiceId={selectedInvoiceId}
+          onBack={onBack}
+          onPay={() => setShowPayment(true)}
+        />
+      )
+    }
+    return (
+      <PortalInvoicesPage
+        token={token}
+        onViewInvoice={onViewInvoice}
+        onPayInvoice={onPayInvoice}
+      />
+    )
+  }
+
+  if (location.pathname === '/portal/quotes') {
+    return <PortalQuotesPage token={token} onViewQuote={() => {}} />
+  }
+
+  if (location.pathname === '/portal/payments') {
+    return (
+      <div style={{ padding: '40px', textAlign: 'center' }}>
+        <p style={{ color: '#6b7280' }}>Historique des paiements</p>
+      </div>
+    )
+  }
+
+  if (location.pathname === '/portal/profile') {
+    return <PortalProfilePage token={token} />
+  }
+
+  return <PortalDashboardPage token={token} onViewInvoice={onViewInvoice} />
+}
+
+export default function App() {
+  const init = useAuthStore(s => s.init)
+  const portalInit = usePortalAuthStore(s => s.init)
+
+  useEffect(() => {
+    init()
+    portalInit()
+  }, [init, portalInit])
 
   return (
     <BrowserRouter>
@@ -53,6 +209,7 @@ export default function App() {
         }}
       />
       <Routes>
+        {/* Admin Routes */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/" element={<RequireAuth><Layout /></RequireAuth>}>
           <Route index element={<Navigate to="/dashboard" replace />} />
@@ -62,49 +219,32 @@ export default function App() {
           <Route path="invoices/:id" element={<InvoiceDetailPage />} />
           <Route path="products" element={<ProductsPage />} />
           <Route path="payments" element={<PaymentsPage />} />
-          {/* Placeholder routes for navigation items */}
-          <Route path="quotes" element={<ComingSoonPage title="Devis" />} />
-          <Route path="expenses" element={<ComingSoonPage title="Dépenses" />} />
-          <Route path="reports" element={<ComingSoonPage title="Rapports" />} />
+          <Route path="quotes" element={<QuotesPage />} />
+          <Route path="expenses" element={<ExpensesPage />} />
+          <Route path="reports" element={<ReportsPage />} />
+          {/* Purchase routes */}
+          <Route path="purchase-orders" element={<PurchaseOrdersPage />} />
+          <Route path="supplier-invoices" element={<SupplierInvoicesPage />} />
         </Route>
+
+        {/* Portal Routes */}
+        <Route
+          path="/portal/login"
+          element={
+            <PortalLoginPage
+              onLogin={(token, client) => {
+                usePortalAuthStore.getState().setClient(client, token)
+              }}
+            />
+          }
+        />
+        <Route path="/portal/*" element={<PortalRoutes />} />
+
+        {/* Public Invoice View */}
+        <Route path="/invoice/view" element={<PublicInvoicePage />} />
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
-  )
-}
-
-// Placeholder for pages not yet implemented
-function ComingSoonPage({ title }: { title: string }) {
-  return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      minHeight: 400,
-      textAlign: 'center'
-    }}>
-      <div style={{
-        fontSize: 48,
-        marginBottom: 16,
-        opacity: 0.3
-      }}>
-        🚧
-      </div>
-      <h2 style={{
-        fontSize: 24,
-        fontWeight: 600,
-        marginBottom: 8,
-        color: 'var(--text-primary)'
-      }}>
-        {title}
-      </h2>
-      <p style={{
-        color: 'var(--text-secondary)',
-        maxWidth: 400
-      }}>
-        Cette fonctionnalité sera bientôt disponible. Nous travaillons activement pour vous offrir une expérience complète.
-      </p>
-    </div>
   )
 }

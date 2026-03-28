@@ -5,11 +5,17 @@ import logging
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 from app.api.v1.router import api_router
 from app.core.config import get_settings
 from app.core.database import engine
+from app.core.metrics import (
+    PrometheusMiddleware,
+    metrics_endpoint,
+    set_app_info,
+)
+from app.core.monitoring import init_sentry
 from app.models import *  # noqa: F401,F403 — ensure models registered
 
 settings = get_settings()
@@ -20,6 +26,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Initialize Sentry for error tracking (if configured)
+init_sentry()
 
 app = FastAPI(
     title="FacturePro Africa API",
@@ -28,6 +36,16 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+# Set application info for Prometheus metrics
+set_app_info(
+    version="1.0.0",
+    environment=settings.APP_ENV,
+)
+
+# ─── Prometheus Metrics Middleware ───
+# Must be added before other middleware for accurate timing
+app.add_middleware(PrometheusMiddleware)
 
 # ─── CORS ───
 app.add_middleware(
@@ -46,6 +64,17 @@ app.include_router(api_router)
 @app.get("/health", tags=["Health"])
 async def health():
     return {"status": "ok", "app": settings.APP_NAME, "env": settings.APP_ENV}
+
+
+# ─── Prometheus Metrics ───
+@app.get("/metrics", tags=["Monitoring"])
+async def metrics():
+    """Prometheus metrics endpoint.
+    
+    Exposes application metrics for Prometheus to scrape.
+    Includes business metrics, system metrics, and subscription metrics.
+    """
+    return metrics_endpoint()
 
 
 # ─── Exception handlers ───

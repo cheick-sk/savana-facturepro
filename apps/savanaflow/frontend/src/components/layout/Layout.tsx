@@ -2,7 +2,7 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { 
   ShoppingCart, Package, BarChart2, Warehouse, LayoutDashboard, Store, LogOut, 
   Menu, X, ChevronLeft, ChevronRight, Bell, Settings, Search, 
-  TrendingUp, Users, HelpCircle, Moon, Sun
+  TrendingUp, Users, HelpCircle, Moon, Sun, Gift, UserCog, Clock, DollarSign
 } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { useAuthStore } from '../../store/auth'
@@ -13,12 +13,18 @@ const NAV_ITEMS = [
   { to: '/products', icon: Package, label: 'Produits', section: 'inventory' },
   { to: '/stock', icon: Warehouse, label: 'Stock', section: 'inventory' },
   { to: '/stores', icon: Store, label: 'Magasins', section: 'inventory' },
+  { to: '/employees', icon: UserCog, label: 'Employés', section: 'hr' },
+  { to: '/shifts', icon: Clock, label: 'Shifts', section: 'hr' },
+  { to: '/commissions', icon: DollarSign, label: 'Commissions', section: 'hr' },
+  { to: '/loyalty', icon: Gift, label: 'Fidélité', section: 'customers' },
   { to: '/reports', icon: BarChart2, label: 'Rapports', section: 'analytics' },
 ]
 
 const SECTIONS = {
   main: { label: 'Principal', collapsed: false },
   inventory: { label: 'Gestion', collapsed: false },
+  hr: { label: 'Ressources Humaines', collapsed: false },
+  customers: { label: 'Clients', collapsed: false },
   analytics: { label: 'Analyse', collapsed: false },
 }
 

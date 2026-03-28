@@ -1,0 +1,365 @@
+# Dependabot configuration for automated dependency updates
+# Documentation: https://docs.github.com/en/code-security/dependabot/dependabot-version-updates
+
+version: 2
+
+registries:
+  # NPM registry (optional, for private packages)
+  npm-registry:
+    type: npm-registry
+    url: https://registry.npmjs.org
+
+updates:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # GitHub Actions
+  # ─────────────────────────────────────────────────────────────────────────────
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Africa/Lagos"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    labels:
+      - "ci-cd"
+      - "dependencies"
+    reviewers:
+      - "savana-africa/devops-team"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # FacturePro Backend (Python)
+  # ─────────────────────────────────────────────────────────────────────────────
+  - package-ecosystem: "pip"
+    directory: "/apps/facturepro/backend"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "06:00"
+      timezone: "Africa/Lagos"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(facturepro-backend)"
+      include: "scope"
+    labels:
+      - "facturepro"
+      - "backend"
+      - "python"
+      - "dependencies"
+    reviewers:
+      - "savana-africa/backend-team"
+    ignore:
+      # Ignore major version updates for stable packages
+      - dependency-name: "fastapi"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "sqlalchemy"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "pydantic"
+        update-types: ["version-update:semver-major"]
+    groups:
+      python-deps:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # SavanaFlow Backend (Python)
+  # ─────────────────────────────────────────────────────────────────────────────
+  - package-ecosystem: "pip"
+    directory: "/apps/savanaflow/backend"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "06:00"
+      timezone: "Africa/Lagos"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(savanaflow-backend)"
+      include: "scope"
+    labels:
+      - "savanaflow"
+      - "backend"
+      - "python"
+      - "dependencies"
+    reviewers:
+      - "savana-africa/backend-team"
+    ignore:
+      - dependency-name: "fastapi"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "sqlalchemy"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "pydantic"
+        update-types: ["version-update:semver-major"]
+    groups:
+      python-deps:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # SchoolFlow Backend (Python)
+  # ─────────────────────────────────────────────────────────────────────────────
+  - package-ecosystem: "pip"
+    directory: "/apps/schoolflow/backend"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "06:00"
+      timezone: "Africa/Lagos"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(schoolflow-backend)"
+      include: "scope"
+    labels:
+      - "schoolflow"
+      - "backend"
+      - "python"
+      - "dependencies"
+    reviewers:
+      - "savana-africa/backend-team"
+    ignore:
+      - dependency-name: "fastapi"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "sqlalchemy"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "pydantic"
+        update-types: ["version-update:semver-major"]
+    groups:
+      python-deps:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # FacturePro Frontend (JavaScript/TypeScript)
+  # ─────────────────────────────────────────────────────────────────────────────
+  - package-ecosystem: "npm"
+    directory: "/apps/facturepro/frontend"
+    schedule:
+      interval: "weekly"
+      day: "wednesday"
+      time: "06:00"
+      timezone: "Africa/Lagos"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(facturepro-frontend)"
+      include: "scope"
+    labels:
+      - "facturepro"
+      - "frontend"
+      - "javascript"
+      - "dependencies"
+    reviewers:
+      - "savana-africa/frontend-team"
+    ignore:
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react-dom"
+        update-types: ["version-update:semver-major"]
+    groups:
+      react-ecosystem:
+        patterns:
+          - "react*"
+          - "@types/react*"
+        update-types:
+          - "minor"
+          - "patch"
+      ui-libs:
+        patterns:
+          - "recharts"
+          - "lucide-react"
+          - "clsx"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # SavanaFlow Frontend (JavaScript/TypeScript)
+  # ─────────────────────────────────────────────────────────────────────────────
+  - package-ecosystem: "npm"
+    directory: "/apps/savanaflow/frontend"
+    schedule:
+      interval: "weekly"
+      day: "wednesday"
+      time: "06:00"
+      timezone: "Africa/Lagos"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(savanaflow-frontend)"
+      include: "scope"
+    labels:
+      - "savanaflow"
+      - "frontend"
+      - "javascript"
+      - "dependencies"
+    reviewers:
+      - "savana-africa/frontend-team"
+    ignore:
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react-dom"
+        update-types: ["version-update:semver-major"]
+    groups:
+      react-ecosystem:
+        patterns:
+          - "react*"
+          - "@types/react*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # SchoolFlow Frontend (JavaScript/TypeScript)
+  # ─────────────────────────────────────────────────────────────────────────────
+  - package-ecosystem: "npm"
+    directory: "/apps/schoolflow/frontend"
+    schedule:
+      interval: "weekly"
+      day: "wednesday"
+      time: "06:00"
+      timezone: "Africa/Lagos"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps(schoolflow-frontend)"
+      include: "scope"
+    labels:
+      - "schoolflow"
+      - "frontend"
+      - "javascript"
+      - "dependencies"
+    reviewers:
+      - "savana-africa/frontend-team"
+    ignore:
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react-dom"
+        update-types: ["version-update:semver-major"]
+    groups:
+      react-ecosystem:
+        patterns:
+          - "react*"
+          - "@types/react*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Docker Images
+  # ─────────────────────────────────────────────────────────────────────────────
+  - package-ecosystem: "docker"
+    directory: "/apps/facturepro/backend"
+    schedule:
+      interval: "monthly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Africa/Lagos"
+    commit-message:
+      prefix: "docker(facturepro-backend)"
+    labels:
+      - "facturepro"
+      - "docker"
+      - "dependencies"
+
+  - package-ecosystem: "docker"
+    directory: "/apps/savanaflow/backend"
+    schedule:
+      interval: "monthly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Africa/Lagos"
+    commit-message:
+      prefix: "docker(savanaflow-backend)"
+    labels:
+      - "savanaflow"
+      - "docker"
+      - "dependencies"
+
+  - package-ecosystem: "docker"
+    directory: "/apps/schoolflow/backend"
+    schedule:
+      interval: "monthly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Africa/Lagos"
+    commit-message:
+      prefix: "docker(schoolflow-backend)"
+    labels:
+      - "schoolflow"
+      - "docker"
+      - "dependencies"
+
+  - package-ecosystem: "docker"
+    directory: "/apps/facturepro/frontend"
+    schedule:
+      interval: "monthly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Africa/Lagos"
+    commit-message:
+      prefix: "docker(facturepro-frontend)"
+    labels:
+      - "facturepro"
+      - "docker"
+      - "dependencies"
+
+  - package-ecosystem: "docker"
+    directory: "/apps/savanaflow/frontend"
+    schedule:
+      interval: "monthly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Africa/Lagos"
+    commit-message:
+      prefix: "docker(savanaflow-frontend)"
+    labels:
+      - "savanaflow"
+      - "docker"
+      - "dependencies"
+
+  - package-ecosystem: "docker"
+    directory: "/apps/schoolflow/frontend"
+    schedule:
+      interval: "monthly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Africa/Lagos"
+    commit-message:
+      prefix: "docker(schoolflow-frontend)"
+    labels:
+      - "schoolflow"
+      - "docker"
+      - "dependencies"

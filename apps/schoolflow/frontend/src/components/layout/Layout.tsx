@@ -1,5 +1,5 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
-import { Users, BookOpen, LayoutDashboard, Award, DollarSign, LogOut, Menu, X } from 'lucide-react'
+import { Users, BookOpen, LayoutDashboard, Award, DollarSign, LogOut, Menu, X, Clock, Calendar, User, CalendarCheck } from 'lucide-react'
 import { useState } from 'react'
 import { useAuthStore } from '../../store/auth'
 
@@ -9,6 +9,10 @@ const NAV = [
   { to: '/classes', icon: BookOpen, label: 'Classes' },
   { to: '/grades', icon: Award, label: 'Notes' },
   { to: '/fees', icon: DollarSign, label: 'Scolarité' },
+  { to: '/attendance', icon: CalendarCheck, label: 'Présences' },
+  { to: '/timetable/class', icon: Calendar, label: 'Emploi du temps' },
+  { to: '/timetable/slots', icon: Clock, label: 'Créneaux' },
+  { to: '/timetable/teacher', icon: User, label: 'Planning profs' },
 ]
 
 export default function Layout() {
@@ -22,7 +26,7 @@ export default function Layout() {
           {open && <div><div style={{ fontWeight: 500, fontSize: 15 }}>SchoolFlow Africa</div><div style={{ fontSize: 11, color: 'var(--color-text-secondary)' }}>Gestion Scolaire</div></div>}
           <button onClick={() => setOpen(!open)} style={{ border: 'none', background: 'none', cursor: 'pointer', padding: 4, color: 'var(--color-text-secondary)' }}>{open ? <X size={16} /> : <Menu size={16} />}</button>
         </div>
-        <nav style={{ flex: 1, padding: '8px 0' }}>
+        <nav style={{ flex: 1, padding: '8px 0', overflowY: 'auto' }}>
           {NAV.map(({ to, icon: Icon, label }) => (
             <NavLink key={to} to={to} style={({ isActive }) => ({ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', margin: '2px 8px', borderRadius: 8, textDecoration: 'none', fontSize: 13, background: isActive ? 'var(--color-background-secondary)' : 'transparent', color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-secondary)' })}>
               <Icon size={16} />{open && <span>{label}</span>}

@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.all_models import (
     LoyaltyTransaction, POSCustomer, Product, ProductVariant,
-    Promotion, Sale, SaleItem, StockMovement,
+    Promotion, Sale, SaleItem, StockMovement, Employee,
 )
 from app.schemas.schemas import SaleCreate
 
@@ -221,6 +221,7 @@ async def process_sale(db: AsyncSession, data: SaleCreate, user_id: int) -> Sale
         sale_number=_gen_sale_number(count),
         store_id=data.store_id,
         user_id=user_id,
+        employee_id=data.employee_id,
         shift_id=data.shift_id,
         customer_id=data.customer_id,
         promotion_id=promo_id,
@@ -291,6 +292,15 @@ async def process_sale(db: AsyncSession, data: SaleCreate, user_id: int) -> Sale
         if shift and shift.status == "OPEN":
             shift.total_sales = round(float(shift.total_sales) + float(sale.total_amount), 2)
             shift.sales_count = (shift.sales_count or 0) + 1
+
+    # Calculate employee commission if applicable
+    if data.employee_id:
+        employee = (await db.execute(
+            select(Employee).where(Employee.id == data.employee_id)
+        )).scalar_one_or_none()
+        if employee and employee.commission_enabled:
+            from app.services.employee_service import calculate_commission
+            await calculate_commission(db, employee, sale)
 
     await db.flush()
     await db.refresh(sale)

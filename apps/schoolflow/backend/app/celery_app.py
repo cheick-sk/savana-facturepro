@@ -17,6 +17,7 @@ celery_app = Celery(
         "app.tasks.fees",
         "app.tasks.reports",
         "app.tasks.notifications",
+        "app.tasks.attendance",
     ]
 )
 
@@ -46,6 +47,16 @@ celery_app.conf.update(
         "generate-term-reports": {
             "task": "app.tasks.reports.generate_term_reports",
             "schedule": crontab(day_of_week=1, hour=6, minute=0),
+        },
+        # Check consecutive absences daily at 9:00 UTC
+        "check-consecutive-absences": {
+            "task": "app.tasks.attendance.check_consecutive_absences",
+            "schedule": crontab(hour=9, minute=0),
+        },
+        # Send daily attendance summary at 16:00 UTC
+        "send-daily-attendance-summary": {
+            "task": "app.tasks.attendance.send_daily_attendance_summary",
+            "schedule": crontab(hour=16, minute=0),
         },
     },
 )

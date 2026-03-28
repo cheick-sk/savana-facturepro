@@ -1,6 +1,6 @@
 """Pydantic v2 schemas for SavanaFlow POS — Production Edition."""
 from __future__ import annotations
-from datetime import datetime
+from datetime import datetime, date
 from typing import Any
 from pydantic import BaseModel, EmailStr, Field
 
@@ -342,6 +342,7 @@ class SaleItemOut(BaseModel):
 
 class SaleCreate(BaseModel):
     store_id: int
+    employee_id: int | None = None
     shift_id: int | None = None
     customer_id: int | None = None
     promotion_code: str | None = None
@@ -521,6 +522,270 @@ class POSDashboard(BaseModel):
     loyalty_customers_count: int
     pending_transfers: int
     pending_pos: int
+
+
+# ── Employee ───────────────────────────────────────────────────────
+class EmployeeCreate(BaseModel):
+    user_id: int | None = None
+    first_name: str = Field(min_length=1, max_length=100)
+    last_name: str = Field(min_length=1, max_length=100)
+    email: EmailStr | None = None
+    phone: str | None = Field(None, max_length=30)
+    position: str = Field(pattern="^(vendeur|caissier|manager|gerant)$")
+    hire_date: date
+    store_ids: list[int] = Field(default_factory=list)  # Assigned stores
+    primary_store_id: int | None = None
+    
+    # Access rights
+    can_void_sale: bool = False
+    can_refund: bool = False
+    can_apply_discount: bool = False
+    max_discount_percent: float = Field(default=0, ge=0, le=100)
+    can_open_close_shift: bool = False
+    can_manage_products: bool = False
+    can_view_reports: bool = False
+    can_manage_employees: bool = False
+    
+    # Commission settings
+    commission_enabled: bool = False
+    commission_type: str = Field(default="percent", pattern="^(percent|fixed)$")
+    commission_value: float = Field(default=0, ge=0)
+    
+    # Salary info
+    base_salary: float | None = Field(None, ge=0)
+    salary_frequency: str = Field(default="monthly", pattern="^(daily|weekly|monthly)$")
+
+class EmployeeUpdate(BaseModel):
+    first_name: str | None = Field(None, max_length=100)
+    last_name: str | None = Field(None, max_length=100)
+    email: EmailStr | None = None
+    phone: str | None = Field(None, max_length=30)
+    position: str | None = Field(None, pattern="^(vendeur|caissier|manager|gerant)$")
+    termination_date: date | None = None
+    store_ids: list[int] | None = None
+    primary_store_id: int | None = None
+    
+    # Access rights
+    can_void_sale: bool | None = None
+    can_refund: bool | None = None
+    can_apply_discount: bool | None = None
+    max_discount_percent: float | None = Field(None, ge=0, le=100)
+    can_open_close_shift: bool | None = None
+    can_manage_products: bool | None = None
+    can_view_reports: bool | None = None
+    can_manage_employees: bool | None = None
+    
+    # Commission settings
+    commission_enabled: bool | None = None
+    commission_type: str | None = Field(None, pattern="^(percent|fixed)$")
+    commission_value: float | None = Field(None, ge=0)
+    
+    # Salary info
+    base_salary: float | None = Field(None, ge=0)
+    salary_frequency: str | None = Field(None, pattern="^(daily|weekly|monthly)$")
+    
+    is_active: bool | None = None
+
+class EmployeePermissionOut(BaseModel):
+    model_config = {"from_attributes": True}
+    id: int
+    employee_id: int
+    permission: str
+    is_granted: bool
+
+class EmployeePermissionUpdate(BaseModel):
+    permission: str = Field(max_length=100)
+    is_granted: bool = True
+
+class StoreSimpleOut(BaseModel):
+    model_config = {"from_attributes": True}
+    id: int
+    name: str
+    city: str | None
+
+class EmployeeOut(BaseModel):
+    model_config = {"from_attributes": True}
+    id: int
+    user_id: int | None
+    first_name: str
+    last_name: str
+    email: str | None
+    phone: str | None
+    employee_number: str
+    position: str
+    hire_date: date
+    termination_date: date | None
+    
+    # Access rights
+    can_void_sale: bool
+    can_refund: bool
+    can_apply_discount: bool
+    max_discount_percent: float
+    can_open_close_shift: bool
+    can_manage_products: bool
+    can_view_reports: bool
+    can_manage_employees: bool
+    
+    # Commission settings
+    commission_enabled: bool
+    commission_type: str
+    commission_value: float
+    
+    # Salary info
+    base_salary: float | None
+    salary_frequency: str
+    
+    # Status & Stats
+    is_active: bool
+    total_sales: float
+    total_commission: float
+    
+    assigned_stores: list[StoreSimpleOut] = []
+    permissions: list[EmployeePermissionOut] = []
+    
+    created_at: datetime
+    updated_at: datetime
+    
+    @property
+    def full_name(self) -> str:
+        return f"{self.first_name} {self.last_name}"
+
+class EmployeeListOut(BaseModel):
+    model_config = {"from_attributes": True}
+    id: int
+    first_name: str
+    last_name: str
+    employee_number: str
+    position: str
+    is_active: bool
+    total_sales: float
+    total_commission: float
+    phone: str | None
+    
+    @property
+    def full_name(self) -> str:
+        return f"{self.first_name} {self.last_name}"
+
+
+# ── Shift Record ───────────────────────────────────────────────────
+class ClockInRequest(BaseModel):
+    employee_id: int
+    store_id: int
+    shift_id: int | None = None
+    opening_cash: float | None = Field(None, ge=0)
+    notes: str | None = None
+
+class ClockOutRequest(BaseModel):
+    shift_record_id: int
+    closing_cash: float = Field(ge=0)
+    notes: str | None = None
+
+class ShiftRecordOut(BaseModel):
+    model_config = {"from_attributes": True}
+    id: int
+    employee_id: int
+    store_id: int
+    shift_id: int | None
+    clock_in: datetime
+    clock_out: datetime | None
+    opening_cash: float | None
+    closing_cash: float | None
+    cash_difference: float
+    sales_count: int
+    sales_total: float
+    refunds_count: int
+    refunds_total: float
+    commission_earned: float
+    notes: str | None
+    status: str
+    created_at: datetime
+
+class ShiftRecordDetailOut(ShiftRecordOut):
+    employee: EmployeeListOut | None = None
+    store: StoreSimpleOut | None = None
+
+class ActiveShiftOut(BaseModel):
+    model_config = {"from_attributes": True}
+    id: int
+    employee_id: int
+    store_id: int
+    clock_in: datetime
+    opening_cash: float | None
+    sales_count: int
+    sales_total: float
+    employee: EmployeeListOut | None = None
+    store: StoreSimpleOut | None = None
+
+
+# ── Employee Commission ─────────────────────────────────────────────
+class EmployeeCommissionOut(BaseModel):
+    model_config = {"from_attributes": True}
+    id: int
+    employee_id: int
+    shift_record_id: int | None
+    sale_id: int | None
+    sale_amount: float
+    commission_rate: float
+    commission_amount: float
+    is_paid: bool
+    paid_at: datetime | None
+    created_at: datetime
+
+class EmployeeCommissionDetailOut(EmployeeCommissionOut):
+    employee: EmployeeListOut | None = None
+
+class PayCommissionsRequest(BaseModel):
+    commission_ids: list[int] = Field(min_length=1)
+
+class CommissionReport(BaseModel):
+    employee_id: int
+    employee_name: str
+    total_commission: float
+    paid_commission: float
+    unpaid_commission: float
+    commission_count: int
+    sales_total: float
+
+
+# ── Employee Performance ────────────────────────────────────────────
+class EmployeePerformanceOut(BaseModel):
+    employee_id: int
+    employee_name: str
+    period: str
+    sales_count: int
+    sales_total: float
+    refunds_count: int
+    refunds_total: float
+    commission_earned: float
+    hours_worked: float
+    avg_sale_value: float
+    top_products: list[dict[str, Any]]
+    sales_by_day: list[dict[str, Any]]
+    sales_by_hour: list[dict[str, Any]]
+
+class EmployeeCompareOut(BaseModel):
+    employees: list[dict[str, Any]]
+    metric: str
+    period: str
+
+class EmployeeHoursReport(BaseModel):
+    employee_id: int
+    employee_name: str
+    total_hours: float
+    shifts_count: int
+    avg_hours_per_shift: float
+    overtime_hours: float
+    shifts: list[ShiftRecordOut]
+
+class EmployeeSalesReport(BaseModel):
+    employee_id: int
+    employee_name: str
+    period: str
+    sales_count: int
+    sales_total: float
+    avg_sale_value: float
+    top_products: list[dict[str, Any]]
+    sales_by_payment_method: list[dict[str, Any]]
 
 
 # ── Pagination ──────────────────────────────────────────────────

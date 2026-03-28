@@ -313,6 +313,12 @@ class Invoice(Base):
     notes_internal: Mapped[str | None] = mapped_column(Text, nullable=True)
     pdf_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
     payment_link_token: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True, index=True)
+
+    # Portal access
+    portal_token: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True, index=True)
+    portal_token_expires: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    portal_viewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
 
@@ -493,7 +499,11 @@ class Expense(Base):
 
 # ── Purchase Order (Bon de commande) ───────────────────────────
 class PurchaseOrder(Base):
+    """Commande fournisseur."""
     __tablename__ = "purchase_orders"
+    __table_args__ = (
+        Index("ix_purchase_orders_org_id", "organisation_id"),
+    )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     organisation_id: Mapped[int] = mapped_column(ForeignKey("organisations.id"), nullable=False, index=True)
@@ -501,19 +511,41 @@ class PurchaseOrder(Base):
     supplier_id: Mapped[int] = mapped_column(ForeignKey("suppliers.id"), nullable=False)
     created_by: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="DRAFT")
+    # DRAFT, SENT, CONFIRMED, PARTIAL, RECEIVED, CANCELLED
+
     order_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
     expected_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     received_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # Supplier reference (their PO number)
+    supplier_reference: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
+    # Totals
     subtotal: Mapped[float] = mapped_column(Numeric(14, 2), default=0.0)
     tax_amount: Mapped[float] = mapped_column(Numeric(14, 2), default=0.0)
     total_amount: Mapped[float] = mapped_column(Numeric(14, 2), default=0.0)
     currency: Mapped[str] = mapped_column(String(5), default="XOF")
+
+    # Notes and terms
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    terms: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Track receipt progress
+    total_items: Mapped[int] = mapped_column(Integer, default=0)
+    received_items: Mapped[int] = mapped_column(Integer, default=0)
+
+    # PDF path
+    pdf_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now_utc, onupdate=now_utc)
 
+    # Relationships
     supplier: Mapped["Supplier"] = relationship(back_populates="purchase_orders", lazy="selectin")
     items: Mapped[list["PurchaseOrderItem"]] = relationship(back_populates="po", lazy="selectin", cascade="all, delete-orphan")
+    receptions: Mapped[list["PurchaseReception"]] = relationship(back_populates="purchase_order", lazy="noload")
+    supplier_invoices: Mapped[list["SupplierInvoice"]] = relationship(back_populates="purchase_order", lazy="noload")
+    created_by_user: Mapped["User"] = relationship(lazy="selectin")
 
 
 class PurchaseOrderItem(Base):
