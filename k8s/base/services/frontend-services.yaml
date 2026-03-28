@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: facturepro-frontend
+  namespace: saas-africa
+  labels:
+    app: facturepro-frontend
+    app.kubernetes.io/name: facturepro-frontend
+    app.kubernetes.io/component: frontend
+spec:
+  type: ClusterIP
+  selector:
+    app: facturepro-frontend
+  ports:
+  - name: http
+    port: 80
+    targetPort: http
+    protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: savanaflow-frontend
+  namespace: saas-africa
+  labels:
+    app: savanaflow-frontend
+    app.kubernetes.io/name: savanaflow-frontend
+    app.kubernetes.io/component: frontend
+spec:
+  type: ClusterIP
+  selector:
+    app: savanaflow-frontend
+  ports:
+  - name: http
+    port: 80
+    targetPort: http
+    protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: schoolflow-frontend
+  namespace: saas-africa
+  labels:
+    app: schoolflow-frontend
+    app.kubernetes.io/name: schoolflow-frontend
+    app.kubernetes.io/component: frontend
+spec:
+  type: ClusterIP
+  selector:
+    app: schoolflow-frontend
+  ports:
+  - name: http
+    port: 80
+    targetPort: http
+    protocol: TCP

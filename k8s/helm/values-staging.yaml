@@ -1,0 +1,168 @@
+# SaaS Africa Staging Helm Values
+# Overrides for staging environment
+
+global:
+  environment: staging
+
+# FacturePro Configuration
+facturepro:
+  backend:
+    replicaCount: 1
+    image:
+      tag: staging
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
+    autoscaling:
+      enabled: false
+    env:
+      LOG_LEVEL: "DEBUG"
+      
+  frontend:
+    replicaCount: 1
+    image:
+      tag: staging
+    autoscaling:
+      enabled: false
+
+# SavanaFlow Configuration
+savanaflow:
+  backend:
+    replicaCount: 1
+    image:
+      tag: staging
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
+    autoscaling:
+      enabled: false
+      
+  frontend:
+    replicaCount: 1
+    image:
+      tag: staging
+    autoscaling:
+      enabled: false
+
+# SchoolFlow Configuration
+schoolflow:
+  backend:
+    replicaCount: 1
+    image:
+      tag: staging
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 250m
+        memory: 256Mi
+    autoscaling:
+      enabled: false
+      
+  frontend:
+    replicaCount: 1
+    image:
+      tag: staging
+    autoscaling:
+      enabled: false
+
+# Celery Workers Configuration
+celery:
+  worker:
+    replicaCount: 1
+    image:
+      tag: staging
+    autoscaling:
+      enabled: false
+
+# PostgreSQL Configuration
+postgresql:
+  primary:
+    persistence:
+      size: 20Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+
+# Redis Configuration
+redis:
+  master:
+    persistence:
+      size: 5Gi
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 512Mi
+
+# Ingress Configuration
+ingress:
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-staging
+  tls:
+    hosts:
+      - staging.facturepro.africa
+      - api-staging.facturepro.africa
+      - staging.savanaflow.africa
+      - api-staging.savanaflow.africa
+      - staging.schoolflow.africa
+      - api-staging.schoolflow.africa
+  hosts:
+    - host: api-staging.facturepro.africa
+      paths:
+        - path: /
+          pathType: Prefix
+          service: facturepro-backend
+          port: 8000
+    - host: staging.facturepro.africa
+      paths:
+        - path: /
+          pathType: Prefix
+          service: facturepro-frontend
+          port: 80
+    - host: api-staging.savanaflow.africa
+      paths:
+        - path: /
+          pathType: Prefix
+          service: savanaflow-backend
+          port: 8000
+    - host: staging.savanaflow.africa
+      paths:
+        - path: /
+          pathType: Prefix
+          service: savanaflow-frontend
+          port: 80
+    - host: api-staging.schoolflow.africa
+      paths:
+        - path: /
+          pathType: Prefix
+          service: schoolflow-backend
+          port: 8000
+    - host: staging.schoolflow.africa
+      paths:
+        - path: /
+          pathType: Prefix
+          service: schoolflow-frontend
+          port: 80
+
+# Monitoring Configuration
+monitoring:
+  prometheus:
+    serviceMonitor:
+      labels:
+        release: prometheus-staging

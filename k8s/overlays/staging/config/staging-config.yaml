@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: staging-config
+  namespace: saas-africa
+data:
+  # Staging Environment Configuration
+  ENVIRONMENT: "staging"
+  LOG_LEVEL: "DEBUG"
+  DEBUG_MODE: "true"
+  
+  # Staging Database URLs
+  FACTUREPRO_DATABASE_URL: "postgresql+asyncpg://facturepro:$(DB_PASSWORD)@postgres-facturepro:5432/facturepro_staging"
+  SAHANAFLOW_DATABASE_URL: "postgresql+asyncpg://savanaflow:$(DB_PASSWORD)@postgres-savanaflow:5432/savanaflow_staging"
+  SCHOOLFLOW_DATABASE_URL: "postgresql+asyncpg://schoolflow:$(DB_PASSWORD)@postgres-schoolflow:5432/schoolflow_staging"
+  
+  # Staging CORS Origins
+  CORS_ORIGINS: "https://staging.facturepro.africa,https://staging.savanaflow.africa,https://staging.schoolflow.africa"
+  
+  # Feature Flags for Staging
+  FEATURE_DEBUG_TOOLBAR: "true"
+  FEATURE_PROFILING: "true"

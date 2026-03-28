@@ -1,0 +1,193 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: celery-worker
+  namespace: saas-africa
+  labels:
+    app: celery-worker
+    app.kubernetes.io/name: celery-worker
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/part-of: saas-africa-platform
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: celery-worker
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: celery-worker
+        app.kubernetes.io/name: celery-worker
+        app.kubernetes.io/component: worker
+    spec:
+      serviceAccountName: saas-africa-serviceaccount
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+      - name: celery-worker
+        image: saasafrica/facturepro-backend:latest
+        imagePullPolicy: Always
+        command:
+        - celery
+        - -A
+        - app.celery_app
+        - worker
+        - -l
+        - info
+        - --concurrency=4
+        - --max-tasks-per-child=1000
+        - --time-limit=3600
+        - --soft-time-limit=3300
+        envFrom:
+        - configMapRef:
+            name: app-config
+        - secretRef:
+            name: api-secrets
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: facturepro-database-url
+        - name: CELERY_BROKER_URL
+          valueFrom:
+            secretKeyRef:
+              name: redis-credentials
+              key: celery-broker-facturepro
+        - name: CELERY_RESULT_BACKEND
+          valueFrom:
+            secretKeyRef:
+              name: redis-credentials
+              key: celery-broker-facturepro
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - celery -A app.celery_app inspect ping -d celery@$HOSTNAME
+          initialDelaySeconds: 60
+          periodSeconds: 60
+          timeoutSeconds: 30
+          failureThreshold: 3
+        volumeMounts:
+        - name: tmp-volume
+          mountPath: /tmp
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: tmp-volume
+        emptyDir: {}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: celery-worker
+              topologyKey: kubernetes.io/hostname
+---
+# SavanaFlow Celery Worker
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: savanaflow-celery-worker
+  namespace: saas-africa
+  labels:
+    app: savanaflow-celery-worker
+    app.kubernetes.io/name: savanaflow-celery-worker
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/part-of: savanaflow
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: savanaflow-celery-worker
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: savanaflow-celery-worker
+        app.kubernetes.io/name: savanaflow-celery-worker
+        app.kubernetes.io/component: worker
+    spec:
+      serviceAccountName: saas-africa-serviceaccount
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+      - name: celery-worker
+        image: saasafrica/savanaflow-backend:latest
+        imagePullPolicy: Always
+        command:
+        - celery
+        - -A
+        - app.celery_app
+        - worker
+        - -l
+        - info
+        - --concurrency=2
+        envFrom:
+        - configMapRef:
+            name: app-config
+        - secretRef:
+            name: api-secrets
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: savanaflow-database-url
+        - name: CELERY_BROKER_URL
+          valueFrom:
+            secretKeyRef:
+              name: redis-credentials
+              key: celery-broker-savanaflow
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        volumeMounts:
+        - name: tmp-volume
+          mountPath: /tmp
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: tmp-volume
+        emptyDir: {}

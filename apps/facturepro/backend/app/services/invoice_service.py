@@ -16,6 +16,10 @@ from app.models.all_models import (
 )
 from app.schemas.schemas import InvoiceCreate, InvoiceUpdate
 from app.services.pdf_service import generate_invoice_pdf
+from app.services.webhook_helpers import (
+    trigger_webhook, invoice_to_webhook_data,
+    payment_to_webhook_data, quote_to_webhook_data,
+)
 
 logger = logging.getLogger(__name__)
 UPLOAD_DIR = "/app/uploads/invoices"
@@ -78,7 +82,7 @@ def _compute_invoice_totals(
 
 
 # ── Invoice CRUD ────────────────────────────────────────────────
-async def create_invoice(db: AsyncSession, data: InvoiceCreate, user_id: int) -> Invoice:
+async def create_invoice(db: AsyncSession, data: InvoiceCreate, user_id: int, organisation_id: int = None) -> Invoice:
     count = (await db.execute(select(func.count()).select_from(Invoice))).scalar() or 0
     number = _next_invoice_number(count)
 
@@ -105,6 +109,8 @@ async def create_invoice(db: AsyncSession, data: InvoiceCreate, user_id: int) ->
         tax_amount=tax_total,
         total_amount=total,
     )
+    if organisation_id:
+        invoice.organisation_id = organisation_id
     db.add(invoice)
     await db.flush()
 
@@ -126,10 +132,20 @@ async def create_invoice(db: AsyncSession, data: InvoiceCreate, user_id: int) ->
 
     await db.flush()
     await db.refresh(invoice)
+
+    # Trigger webhook for invoice creation
+    if organisation_id:
+        await trigger_webhook(
+            db, organisation_id, "invoice.created",
+            invoice_to_webhook_data(invoice)
+        )
+
     return invoice
 
 
-async def update_invoice(db: AsyncSession, invoice: Invoice, data: InvoiceUpdate) -> Invoice:
+async def update_invoice(db: AsyncSession, invoice: Invoice, data: InvoiceUpdate, organisation_id: int = None) -> Invoice:
+    old_status = invoice.status
+    
     if data.due_date is not None:
         invoice.due_date = data.due_date
     if data.notes is not None:
@@ -177,6 +193,21 @@ async def update_invoice(db: AsyncSession, invoice: Invoice, data: InvoiceUpdate
 
     await db.flush()
     await db.refresh(invoice)
+
+    # Trigger webhooks for status changes
+    if organisation_id and data.status is not None and old_status != data.status:
+        event_type = f"invoice.{data.status.lower()}"
+        await trigger_webhook(
+            db, organisation_id, event_type,
+            invoice_to_webhook_data(invoice)
+        )
+    elif organisation_id:
+        # General update
+        await trigger_webhook(
+            db, organisation_id, "invoice.updated",
+            invoice_to_webhook_data(invoice)
+        )
+
     return invoice
 
 

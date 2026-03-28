@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: production-config
+  namespace: saas-africa
+data:
+  # Production Environment Configuration
+  ENVIRONMENT: "production"
+  LOG_LEVEL: "INFO"
+  DEBUG_MODE: "false"
+  
+  # Production Database URLs
+  FACTUREPRO_DATABASE_URL: "postgresql+asyncpg://facturepro:$(DB_PASSWORD)@postgres-facturepro:5432/facturepro"
+  SAHANAFLOW_DATABASE_URL: "postgresql+asyncpg://savanaflow:$(DB_PASSWORD)@postgres-savanaflow:5432/savanaflow"
+  SCHOOLFLOW_DATABASE_URL: "postgresql+asyncpg://schoolflow:$(DB_PASSWORD)@postgres-schoolflow:5432/schoolflow"
+  
+  # Production CORS Origins
+  CORS_ORIGINS: "https://facturepro.africa,https://savanaflow.africa,https://schoolflow.africa"
+  
+  # Feature Flags for Production
+  FEATURE_DEBUG_TOOLBAR: "false"
+  FEATURE_PROFILING: "false"
+  FEATURE_METRICS: "true"
+  FEATURE_TRACING: "true"
+  
+  # Performance Settings
+  WORKERS: "4"
+  THREADS: "2"
+  KEEP_ALIVE: "120"
+  
+  # Security Settings
+  SESSION_COOKIE_SECURE: "true"
+  SESSION_COOKIE_HTTPONLY: "true"
+  SESSION_COOKIE_SAMESITE: "strict"
+  SECURE_SSL_REDIRECT: "true"
+  SECURE_HSTS_SECONDS: "31536000"
+  SECURE_HSTS_INCLUDE_SUBDOMAINS: "true"
+  SECURE_HSTS_PRELOAD: "true"

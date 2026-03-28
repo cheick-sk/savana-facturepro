@@ -1,0 +1,152 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: facturepro-backend
+  namespace: saas-africa
+  labels:
+    app: facturepro-backend
+    app.kubernetes.io/name: facturepro-backend
+    app.kubernetes.io/component: backend
+spec:
+  type: ClusterIP
+  selector:
+    app: facturepro-backend
+  ports:
+  - name: http
+    port: 8000
+    targetPort: http
+    protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: savanaflow-backend
+  namespace: saas-africa
+  labels:
+    app: savanaflow-backend
+    app.kubernetes.io/name: savanaflow-backend
+    app.kubernetes.io/component: backend
+spec:
+  type: ClusterIP
+  selector:
+    app: savanaflow-backend
+  ports:
+  - name: http
+    port: 8000
+    targetPort: http
+    protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: schoolflow-backend
+  namespace: saas-africa
+  labels:
+    app: schoolflow-backend
+    app.kubernetes.io/name: schoolflow-backend
+    app.kubernetes.io/component: backend
+spec:
+  type: ClusterIP
+  selector:
+    app: schoolflow-backend
+  ports:
+  - name: http
+    port: 8000
+    targetPort: http
+    protocol: TCP
+---
+# Headless service for StatefulSet postgres
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: saas-africa
+  labels:
+    app: postgres
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/component: database
+spec:
+  type: ClusterIP
+  clusterIP: None
+  selector:
+    app: postgres
+  ports:
+  - name: postgres
+    port: 5432
+    targetPort: 5432
+    protocol: TCP
+---
+# Database services per application
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-facturepro
+  namespace: saas-africa
+  labels:
+    app: postgres
+    app.kubernetes.io/name: postgres-facturepro
+spec:
+  type: ClusterIP
+  selector:
+    app: postgres
+  ports:
+  - name: postgres
+    port: 5432
+    targetPort: 5432
+    protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-savanaflow
+  namespace: saas-africa
+  labels:
+    app: postgres
+    app.kubernetes.io/name: postgres-savanaflow
+spec:
+  type: ClusterIP
+  selector:
+    app: postgres
+  ports:
+  - name: postgres
+    port: 5432
+    targetPort: 5432
+    protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-schoolflow
+  namespace: saas-africa
+  labels:
+    app: postgres
+    app.kubernetes.io/name: postgres-schoolflow
+spec:
+  type: ClusterIP
+  selector:
+    app: postgres
+  ports:
+  - name: postgres
+    port: 5432
+    targetPort: 5432
+    protocol: TCP
+---
+# Redis Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: saas-africa
+  labels:
+    app: redis
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/component: cache
+spec:
+  type: ClusterIP
+  selector:
+    app: redis
+  ports:
+  - name: redis
+    port: 6379
+    targetPort: 6379
+    protocol: TCP

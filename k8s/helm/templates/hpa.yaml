@@ -1,0 +1,107 @@
+{{- if and .Values.facturepro.enabled .Values.facturepro.backend.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: facturepro-backend-hpa
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "saas-africa.labels" . | nindent 4 }}
+    app: facturepro-backend
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: facturepro-backend
+  minReplicas: {{ .Values.facturepro.backend.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.facturepro.backend.autoscaling.maxReplicas }}
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.facturepro.backend.autoscaling.targetCPUUtilizationPercentage }}
+  {{- if .Values.facturepro.backend.autoscaling.targetMemoryUtilizationPercentage }}
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.facturepro.backend.autoscaling.targetMemoryUtilizationPercentage }}
+  {{- end }}
+{{- end }}
+---
+{{- if and .Values.facturepro.enabled .Values.facturepro.frontend.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: facturepro-frontend-hpa
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "saas-africa.labels" . | nindent 4 }}
+    app: facturepro-frontend
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: facturepro-frontend
+  minReplicas: {{ .Values.facturepro.frontend.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.facturepro.frontend.autoscaling.maxReplicas }}
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.facturepro.frontend.autoscaling.targetCPUUtilizationPercentage }}
+{{- end }}
+---
+{{- if and .Values.savanaflow.enabled .Values.savanaflow.backend.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: savanaflow-backend-hpa
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "saas-africa.labels" . | nindent 4 }}
+    app: savanaflow-backend
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: savanaflow-backend
+  minReplicas: {{ .Values.savanaflow.backend.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.savanaflow.backend.autoscaling.maxReplicas }}
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.savanaflow.backend.autoscaling.targetCPUUtilizationPercentage }}
+{{- end }}
+---
+{{- if and .Values.schoolflow.enabled .Values.schoolflow.backend.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: schoolflow-backend-hpa
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "saas-africa.labels" . | nindent 4 }}
+    app: schoolflow-backend
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: schoolflow-backend
+  minReplicas: {{ .Values.schoolflow.backend.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.schoolflow.backend.autoscaling.maxReplicas }}
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.schoolflow.backend.autoscaling.targetCPUUtilizationPercentage }}
+{{- end }}

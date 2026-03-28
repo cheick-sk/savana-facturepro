@@ -13,6 +13,12 @@ from app.models.purchase import (
     PurchaseReception, PurchaseReceptionItem,
     SupplierInvoice, SupplierPayment,
 )
+from app.models.webhooks import (
+    WebhookEndpoint, WebhookEvent, WebhookEventType,
+)
+from app.models.api_key import (
+    APIKey, APIKeyUsage,
+)
 
 __all__ = [
     "User", "UserRole",
@@ -30,4 +36,6 @@ __all__ = [
     "RecurringInvoice", "RecurringFrequency",
     "AuditLog",
     "ClientAccount", "ClientView", "ClientPaymentMethod",
+    "WebhookEndpoint", "WebhookEvent", "WebhookEventType",
+    "APIKey", "APIKeyUsage",
 ]

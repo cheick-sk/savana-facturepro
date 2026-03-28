@@ -1,0 +1,36 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: saas-africa
+
+resources:
+  - ../../base
+
+commonLabels:
+  environment: staging
+
+configMapGenerator:
+  - name: environment-config
+    behavior: merge
+    literals:
+      - ENVIRONMENT=staging
+      - LOG_LEVEL=DEBUG
+      - CORS_ORIGINS=https://staging.facturepro.africa,https://staging.savanaflow.africa,https://staging.schoolflow.africa
+
+patchesStrategicMerge:
+  - patches/replica-patch.yaml
+  - patches/resource-patch.yaml
+
+images:
+  - name: saasafrica/facturepro-backend
+    newTag: staging
+  - name: saasafrica/facturepro-frontend
+    newTag: staging
+  - name: saasafrica/savanaflow-backend
+    newTag: staging
+  - name: saasafrica/savanaflow-frontend
+    newTag: staging
+  - name: saasafrica/schoolflow-backend
+    newTag: staging
+  - name: saasafrica/schoolflow-frontend
+    newTag: staging

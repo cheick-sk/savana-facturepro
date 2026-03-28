@@ -1,0 +1,67 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: saas-africa
+  labels:
+    app.kubernetes.io/name: app-config
+    app.kubernetes.io/component: configuration
+data:
+  # FacturePro Configuration
+  FACTUREPRO_DATABASE_URL: "postgresql+asyncpg://facturepro:$(DB_PASSWORD)@postgres-facturepro:5432/facturepro"
+  FACTUREPRO_REDIS_URL: "redis://redis:6379/0"
+  FACTUREPRO_CELERY_BROKER: "redis://redis:6379/1"
+  FACTUREPRO_CELERY_RESULT_BACKEND: "redis://redis:6379/1"
+  FACTUREPRO_APP_NAME: "FacturePro"
+  FACTUREPRO_APP_ENV: "production"
+  
+  # SavanaFlow Configuration
+  SAHANAFLOW_DATABASE_URL: "postgresql+asyncpg://savanaflow:$(DB_PASSWORD)@postgres-savanaflow:5432/savanaflow"
+  SAHANAFLOW_REDIS_URL: "redis://redis:6379/2"
+  SAHANAFLOW_CELERY_BROKER: "redis://redis:6379/3"
+  SAHANAFLOW_APP_NAME: "SavanaFlow"
+  SAHANAFLOW_APP_ENV: "production"
+  
+  # SchoolFlow Configuration
+  SCHOOLFLOW_DATABASE_URL: "postgresql+asyncpg://schoolflow:$(DB_PASSWORD)@postgres-schoolflow:5432/schoolflow"
+  SCHOOLFLOW_REDIS_URL: "redis://redis:6379/4"
+  SCHOOLFLOW_APP_NAME: "SchoolFlow"
+  SCHOOLFLOW_APP_ENV: "production"
+  
+  # Common Configuration
+  LOG_LEVEL: "INFO"
+  LOG_FORMAT: "json"
+  CORS_ORIGINS: "https://facturepro.africa,https://savanaflow.africa,https://schoolflow.africa"
+  CORS_ALLOW_CREDENTIALS: "true"
+  CORS_ALLOW_METHODS: "GET,POST,PUT,DELETE,PATCH,OPTIONS"
+  CORS_ALLOW_HEADERS: "Authorization,Content-Type,Accept,Origin,X-Requested-With"
+  
+  # Security Configuration
+  SESSION_COOKIE_SECURE: "true"
+  SESSION_COOKIE_HTTPONLY: "true"
+  SESSION_COOKIE_SAMESITE: "lax"
+  
+  # Rate Limiting
+  RATE_LIMIT_REQUESTS: "100"
+  RATE_LIMIT_PERIOD: "60"
+  
+  # File Upload Configuration
+  MAX_UPLOAD_SIZE: "52428800"
+  ALLOWED_EXTENSIONS: "pdf,doc,docx,xls,xlsx,png,jpg,jpeg,gif"
+  
+  # Email Configuration
+  SMTP_HOST: "smtp.sendgrid.net"
+  SMTP_PORT: "587"
+  SMTP_USE_TLS: "true"
+  
+  # Feature Flags
+  FEATURE_INVOICING: "true"
+  FEATURE_EXPENSES: "true"
+  FEATURE_REPORTING: "true"
+  FEATURE_MULTI_TENANT: "true"
+  FEATURE_API_ACCESS: "true"
+  
+  # Health Check Configuration
+  HEALTH_CHECK_PATH: "/health"
+  HEALTH_CHECK_INTERVAL: "30"
+  HEALTH_CHECK_TIMEOUT: "10"

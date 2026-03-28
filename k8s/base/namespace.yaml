@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: saas-africa
+  labels:
+    name: saas-africa
+    environment: production
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/part-of: saas-africa-platform
+  annotations:
+    scheduler.alpha.kubernetes.io/defaultTolerations: '[]'
+    scheduler.alpha.kubernetes.io/tolerationsWhitelist: '[]'

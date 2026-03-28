@@ -5,7 +5,7 @@ from app.api.v1.endpoints import (
     auth, categories, credit_notes, customers,
     dashboard, expenses, invoices, payments,
     products, purchase_orders, quotes, recurring,
-    reports, suppliers, users,
+    reports, suppliers, users, webhooks,
 )
 from app.api.v1.endpoints import ai
 from app.api.v1.endpoints.client_portal import (
@@ -20,6 +20,7 @@ from app.api.v1.endpoints.accounting import (
     tax_router as accounting_tax_router,
     reports_router as accounting_reports_router,
 )
+from app.api.v1.endpoints.public_api import router as public_api_router
 
 api_router = APIRouter(prefix="/api/v1")
 
@@ -43,6 +44,9 @@ api_router.include_router(payments.payment_links_router)
 api_router.include_router(dashboard.router)
 api_router.include_router(reports.router)
 
+# Webhooks
+api_router.include_router(webhooks.router)
+
 # Client Portal routes
 api_router.include_router(portal_public_router)
 api_router.include_router(portal_auth_router)
@@ -57,3 +61,6 @@ api_router.include_router(accounting_reports_router)
 
 # AI Services routes
 api_router.include_router(ai.router)
+
+# Public API routes (for third-party integrations)
+api_router.include_router(public_api_router)

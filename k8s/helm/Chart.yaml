@@ -1,0 +1,39 @@
+apiVersion: v2
+name: saas-africa
+description: SaaS Africa Multi-tenant Platform - FacturePro, SavanaFlow, and SchoolFlow
+type: application
+version: 1.0.0
+appVersion: "2.0.0"
+kubeVersion: ">=1.23.0-0"
+home: https://saas-africa.com
+sources:
+  - https://github.com/saas-africa/platform
+maintainers:
+  - name: SaaS Africa Team
+    email: team@saas-africa.com
+keywords:
+  - saas
+  - africa
+  - invoicing
+  - school
+  - workflow
+  - multi-tenant
+dependencies:
+  - name: postgresql
+    version: "12.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+    alias: postgresql
+  - name: redis
+    version: "17.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled
+    alias: redis
+annotations:
+  artifacthub.io/category: networking
+  artifacthub.io/license: Apache-2.0
+  artifacthub.io/links: |
+    - name: Website
+      url: https://saas-africa.com
+    - name: Documentation
+      url: https://docs.saas-africa.com

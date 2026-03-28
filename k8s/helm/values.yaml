@@ -1,0 +1,358 @@
+# SaaS Africa Helm Values
+# This file contains the default values for the SaaS Africa platform
+
+# Global settings
+global:
+  imageRegistry: docker.io
+  imagePullSecrets: []
+  storageClass: standard
+  environment: production
+
+# Namespace configuration
+namespace:
+  create: true
+  name: saas-africa
+
+# FacturePro Configuration
+facturepro:
+  enabled: true
+  
+  backend:
+    replicaCount: 2
+    image:
+      repository: saasafrica/facturepro-backend
+      tag: latest
+      pullPolicy: Always
+    service:
+      type: ClusterIP
+      port: 8000
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    autoscaling:
+      enabled: true
+      minReplicas: 2
+      maxReplicas: 10
+      targetCPUUtilizationPercentage: 70
+      targetMemoryUtilizationPercentage: 80
+    env:
+      APP_NAME: "FacturePro"
+      LOG_LEVEL: "INFO"
+    envFrom: []
+    secrets: []
+    volumeMounts: []
+    volumes: []
+    
+  frontend:
+    replicaCount: 2
+    image:
+      repository: saasafrica/facturepro-frontend
+      tag: latest
+      pullPolicy: Always
+    service:
+      type: ClusterIP
+      port: 80
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+    autoscaling:
+      enabled: true
+      minReplicas: 2
+      maxReplicas: 5
+      targetCPUUtilizationPercentage: 70
+
+# SavanaFlow Configuration
+savanaflow:
+  enabled: true
+  
+  backend:
+    replicaCount: 2
+    image:
+      repository: saasafrica/savanaflow-backend
+      tag: latest
+      pullPolicy: Always
+    service:
+      type: ClusterIP
+      port: 8000
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    autoscaling:
+      enabled: true
+      minReplicas: 2
+      maxReplicas: 8
+      targetCPUUtilizationPercentage: 70
+      
+  frontend:
+    replicaCount: 2
+    image:
+      repository: saasafrica/savanaflow-frontend
+      tag: latest
+      pullPolicy: Always
+    service:
+      type: ClusterIP
+      port: 80
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+# SchoolFlow Configuration
+schoolflow:
+  enabled: true
+  
+  backend:
+    replicaCount: 2
+    image:
+      repository: saasafrica/schoolflow-backend
+      tag: latest
+      pullPolicy: Always
+    service:
+      type: ClusterIP
+      port: 8000
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    autoscaling:
+      enabled: true
+      minReplicas: 2
+      maxReplicas: 5
+      targetCPUUtilizationPercentage: 70
+      
+  frontend:
+    replicaCount: 2
+    image:
+      repository: saasafrica/schoolflow-frontend
+      tag: latest
+      pullPolicy: Always
+    service:
+      type: ClusterIP
+      port: 80
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+# Celery Workers Configuration
+celery:
+  enabled: true
+  
+  worker:
+    replicaCount: 2
+    image:
+      repository: saasafrica/facturepro-backend
+      tag: latest
+      pullPolicy: Always
+    command:
+      - celery
+      - -A
+      - app.celery_app
+      - worker
+      - -l
+      - info
+      - --concurrency=4
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    autoscaling:
+      enabled: true
+      minReplicas: 2
+      maxReplicas: 10
+      
+  beat:
+    enabled: true
+    replicaCount: 1
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+# PostgreSQL Configuration
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: ""
+    username: ""
+    password: ""
+    database: saas_africa
+    existingSecret: db-credentials
+  primary:
+    persistence:
+      enabled: true
+      size: 50Gi
+      storageClass: standard
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+    service:
+      type: ClusterIP
+      ports:
+        postgresql: 5432
+
+# Redis Configuration
+redis:
+  enabled: true
+  auth:
+    enabled: true
+    password: ""
+    existingSecret: redis-credentials
+  master:
+    persistence:
+      enabled: true
+      size: 10Gi
+      storageClass: standard
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+  replica:
+    replicaCount: 0
+
+# Ingress Configuration
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+  tls:
+    enabled: true
+    hosts:
+      - facturepro.africa
+      - api.facturepro.africa
+      - savanaflow.africa
+      - api.savanaflow.africa
+      - schoolflow.africa
+      - api.schoolflow.africa
+  hosts:
+    - host: api.facturepro.africa
+      paths:
+        - path: /
+          pathType: Prefix
+          service: facturepro-backend
+          port: 8000
+    - host: facturepro.africa
+      paths:
+        - path: /
+          pathType: Prefix
+          service: facturepro-frontend
+          port: 80
+    - host: api.savanaflow.africa
+      paths:
+        - path: /
+          pathType: Prefix
+          service: savanaflow-backend
+          port: 8000
+    - host: savanaflow.africa
+      paths:
+        - path: /
+          pathType: Prefix
+          service: savanaflow-frontend
+          port: 80
+    - host: api.schoolflow.africa
+      paths:
+        - path: /
+          pathType: Prefix
+          service: schoolflow-backend
+          port: 8000
+    - host: schoolflow.africa
+      paths:
+        - path: /
+          pathType: Prefix
+          service: schoolflow-frontend
+          port: 80
+
+# Monitoring Configuration
+monitoring:
+  enabled: true
+  
+  prometheus:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+      labels:
+        release: prometheus
+    rules:
+      enabled: true
+      
+  grafana:
+    enabled: true
+    dashboards:
+      enabled: true
+      
+  alerting:
+    enabled: true
+    alertmanager:
+      enabled: true
+
+# Service Account Configuration
+serviceAccount:
+  create: true
+  name: saas-africa-serviceaccount
+  annotations: {}
+
+# Pod Security Context
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+
+# Node affinity
+affinity: {}
+
+# Tolerations
+tolerations: []
+
+# Node selector
+nodeSelector: {}
+
+# Priority class name
+priorityClassName: ""
+
+# Topology spread constraints
+topologySpreadConstraints: []
+
+# Common labels
+commonLabels: {}
+
+# Common annotations
+commonAnnotations: {}

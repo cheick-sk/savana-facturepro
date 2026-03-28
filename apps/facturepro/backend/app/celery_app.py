@@ -1,5 +1,5 @@
 """Celery application configuration for FacturePro.
-Handles: recurring invoices, payment reminders, quota resets, notifications.
+Handles: recurring invoices, payment reminders, quota resets, notifications, webhooks.
 """
 from celery import Celery
 from celery.schedules import crontab
@@ -13,6 +13,7 @@ celery_app = Celery(
         "app.tasks.invoices",
         "app.tasks.tenant",
         "app.tasks.notifications",
+        "app.tasks.webhooks",
     ]
 )
 
@@ -64,6 +65,27 @@ celery_app.conf.update(
             "schedule": crontab(day_of_week=0, hour=2, minute=0),  # Sunday 2 AM
             "options": {"queue": "maintenance"},
         },
+        
+        # Retry failed webhooks every minute
+        "retry-failed-webhooks": {
+            "task": "app.tasks.webhooks.retry_failed_webhooks",
+            "schedule": crontab(minute="*"),  # Every minute
+            "options": {"queue": "webhooks"},
+        },
+        
+        # Cleanup old webhook events weekly (Sunday 3 AM)
+        "cleanup-old-webhook-events": {
+            "task": "app.tasks.webhooks.cleanup_old_webhook_events",
+            "schedule": crontab(day_of_week=0, hour=3, minute=0),
+            "options": {"queue": "maintenance"},
+        },
+        
+        # Send webhook summary daily at 8 AM UTC
+        "send-webhook-summary": {
+            "task": "app.tasks.webhooks.send_webhook_summary",
+            "schedule": crontab(hour=8, minute=0),
+            "options": {"queue": "notifications"},
+        },
     },
     
     # Task routing
@@ -71,6 +93,7 @@ celery_app.conf.update(
         "app.tasks.invoices.*": {"queue": "invoices"},
         "app.tasks.tenant.*": {"queue": "tenant"},
         "app.tasks.notifications.*": {"queue": "notifications"},
+        "app.tasks.webhooks.*": {"queue": "webhooks"},
     },
     
     # Task default queue

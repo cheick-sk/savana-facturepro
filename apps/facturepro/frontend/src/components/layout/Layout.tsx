@@ -21,7 +21,8 @@ import {
   BookOpen,
   ClipboardList,
   Calendar,
-  PieChart
+  PieChart,
+  Webhook
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuthStore } from '../../store/auth'
@@ -59,6 +60,12 @@ const NAV_ITEMS = [
       { to: '/accounting/entries', icon: ClipboardList, label: 'Écritures' },
       { to: '/accounting/fiscal-years', icon: Calendar, label: 'Exercices' },
       { to: '/accounting/reports', icon: PieChart, label: 'États financiers' },
+    ]
+  },
+  {
+    section: 'Paramètres',
+    items: [
+      { to: '/webhooks', icon: Webhook, label: 'Webhooks' },
     ]
   }
 ]

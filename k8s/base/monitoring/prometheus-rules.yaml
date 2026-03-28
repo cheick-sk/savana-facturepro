@@ -1,0 +1,196 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: saas-africa-alerts
+  namespace: saas-africa
+  labels:
+    app.kubernetes.io/name: saas-africa-alerts
+    app.kubernetes.io/component: monitoring
+    release: prometheus
+spec:
+  groups:
+  - name: saas-africa.rules
+    rules:
+    # Application Alerts
+    - alert: HighErrorRate
+      annotations:
+        description: 'High error rate detected for {{ $labels.app }}: {{ $value | humanizePercentage }}'
+        summary: Error rate above 5% for more than 5 minutes
+      expr: |
+        sum(rate(http_requests_total{namespace="saas-africa",status=~"5.."}[5m])) 
+        / 
+        sum(rate(http_requests_total{namespace="saas-africa"}[5m])) > 0.05
+      for: 5m
+      labels:
+        severity: critical
+        app: saas-africa
+    
+    - alert: HighLatency
+      annotations:
+        description: 'High latency detected for {{ $labels.app }}: {{ $value | humanizeDuration }}'
+        summary: P99 latency above 2 seconds for more than 5 minutes
+      expr: |
+        histogram_quantile(0.99, 
+          sum(rate(http_request_duration_seconds_bucket{namespace="saas-africa"}[5m])) by (le, app)
+        ) > 2
+      for: 5m
+      labels:
+        severity: warning
+        app: saas-africa
+    
+    - alert: PodCrashLooping
+      annotations:
+        description: 'Pod {{ $labels.pod }} is crash looping in namespace {{ $labels.namespace }}'
+        summary: Pod has restarted more than 3 times in the last hour
+      expr: |
+        increase(kube_pod_container_status_restarts_total{namespace="saas-africa"}[1h]) > 3
+      for: 5m
+      labels:
+        severity: critical
+        app: saas-africa
+    
+    - alert: PodNotReady
+      annotations:
+        description: 'Pod {{ $labels.pod }} is not ready in namespace {{ $labels.namespace }}'
+        summary: Pod has been in non-ready state for more than 10 minutes
+      expr: |
+        kube_pod_status_phase{namespace="saas-africa", phase!="Running"} == 1
+      for: 10m
+      labels:
+        severity: critical
+        app: saas-africa
+    
+    # Resource Alerts
+    - alert: HighMemoryUsage
+      annotations:
+        description: 'High memory usage for {{ $labels.pod }}: {{ $value | humanizePercentage }}'
+        summary: Memory usage above 90% for more than 5 minutes
+      expr: |
+        container_memory_usage_bytes{namespace="saas-africa"} 
+        / 
+        container_spec_memory_limit_bytes{namespace="saas-africa"} > 0.9
+      for: 5m
+      labels:
+        severity: warning
+        app: saas-africa
+    
+    - alert: HighCPUUsage
+      annotations:
+        description: 'High CPU usage for {{ $labels.pod }}: {{ $value | humanizePercentage }}'
+        summary: CPU usage above 90% for more than 5 minutes
+      expr: |
+        rate(container_cpu_usage_seconds_total{namespace="saas-africa"}[5m]) 
+        / 
+        kube_pod_container_resource_limits{namespace="saas-africa", resource="cpu"} > 0.9
+      for: 5m
+      labels:
+        severity: warning
+        app: saas-africa
+    
+    # Database Alerts
+    - alert: PostgresDown
+      annotations:
+        description: 'PostgreSQL is down or not responding'
+        summary: PostgreSQL database is not available
+      expr: |
+        pg_up{namespace="saas-africa"} == 0
+      for: 1m
+      labels:
+        severity: critical
+        app: saas-africa
+    
+    - alert: PostgresTooManyConnections
+      annotations:
+        description: 'PostgreSQL has too many connections: {{ $value }}'
+        summary: PostgreSQL connections above 80% of max
+      expr: |
+        pg_stat_activity_count{namespace="saas-africa"} 
+        / 
+        pg_settings_max_connections{namespace="saas-africa"} > 0.8
+      for: 5m
+      labels:
+        severity: warning
+        app: saas-africa
+    
+    # Redis Alerts
+    - alert: RedisDown
+      annotations:
+        description: 'Redis is down or not responding'
+        summary: Redis is not available
+      expr: |
+        redis_up{namespace="saas-africa"} == 0
+      for: 1m
+      labels:
+        severity: critical
+        app: saas-africa
+    
+    - alert: RedisHighMemory
+      annotations:
+        description: 'Redis memory usage is high: {{ $value | humanize1024 }}bytes'
+        summary: Redis memory usage above 80% of max
+      expr: |
+        redis_memory_used_bytes{namespace="saas-africa"} 
+        / 
+        redis_memory_max_bytes{namespace="saas-africa"} > 0.8
+      for: 5m
+      labels:
+        severity: warning
+        app: saas-africa
+    
+    # Celery Alerts
+    - alert: CeleryWorkerDown
+      annotations:
+        description: 'No Celery workers are available for {{ $labels.app }}'
+        summary: All Celery workers are down
+      expr: |
+        celery_workers{namespace="saas-africa"} == 0
+      for: 5m
+      labels:
+        severity: critical
+        app: saas-africa
+    
+    - alert: CeleryQueueHigh
+      annotations:
+        description: 'Celery queue {{ $labels.queue }} has {{ $value }} tasks waiting'
+        summary: Celery queue has more than 1000 tasks waiting
+      expr: |
+        celery_queue_length{namespace="saas-africa"} > 1000
+      for: 5m
+      labels:
+        severity: warning
+        app: saas-africa
+    
+    # Ingress Alerts
+    - alert: IngressDown
+      annotations:
+        description: 'Ingress {{ $labels.ingress }} is not serving traffic'
+        summary: Ingress has no ready backends
+      expr: |
+        nginx_ingress_controller_upstream_server_ready{namespace="saas-africa"} == 0
+      for: 5m
+      labels:
+        severity: critical
+        app: saas-africa
+    
+    # SSL/TLS Alerts
+    - alert: CertificateExpiringSoon
+      annotations:
+        description: 'TLS certificate {{ $labels.secret_name }} expires in {{ $value }} hours'
+        summary: TLS certificate expires within 14 days
+      expr: |
+        (x509_cert_not_after{namespace="saas-africa"} - time()) / 3600 < 336
+      for: 1h
+      labels:
+        severity: warning
+        app: saas-africa
+    
+    - alert: CertificateExpired
+      annotations:
+        description: 'TLS certificate {{ $labels.secret_name }} has expired'
+        summary: TLS certificate has expired
+      expr: |
+        (x509_cert_not_after{namespace="saas-africa"} - time()) / 3600 < 0
+      for: 5m
+      labels:
+        severity: critical
+        app: saas-africa

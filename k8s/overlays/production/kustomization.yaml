@@ -1,0 +1,39 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: saas-africa
+
+resources:
+  - ../../base
+  - hpa/backend-hpa.yaml
+  - hpa/frontend-hpa.yaml
+  - hpa/worker-hpa.yaml
+
+commonLabels:
+  environment: production
+
+configMapGenerator:
+  - name: environment-config
+    behavior: merge
+    literals:
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+
+patchesStrategicMerge:
+  - patches/replica-patch.yaml
+  - patches/resource-patch.yaml
+  - patches/probes-patch.yaml
+
+images:
+  - name: saasafrica/facturepro-backend
+    newTag: v2.0.0
+  - name: saasafrica/facturepro-frontend
+    newTag: v2.0.0
+  - name: saasafrica/savanaflow-backend
+    newTag: v2.0.0
+  - name: saasafrica/savanaflow-frontend
+    newTag: v2.0.0
+  - name: saasafrica/schoolflow-backend
+    newTag: v2.0.0
+  - name: saasafrica/schoolflow-frontend
+    newTag: v2.0.0

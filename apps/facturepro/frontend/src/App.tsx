@@ -29,6 +29,9 @@ import TrialBalancePage from './pages/accounting/TrialBalancePage'
 import BalanceSheetPage from './pages/accounting/BalanceSheetPage'
 import IncomeStatementPage from './pages/accounting/IncomeStatementPage'
 
+// Settings pages
+import WebhooksPage from './pages/settings/WebhooksPage'
+
 // Portal imports
 import PortalLoginPage from './pages/portal/PortalLoginPage'
 import PortalLayout from './components/portal/PortalLayout'
@@ -245,6 +248,9 @@ export default function App() {
           <Route path="accounting/reports/trial-balance" element={<TrialBalancePage />} />
           <Route path="accounting/reports/balance-sheet" element={<BalanceSheetPage />} />
           <Route path="accounting/reports/income-statement" element={<IncomeStatementPage />} />
+
+          {/* Settings routes */}
+          <Route path="webhooks" element={<WebhooksPage />} />
         </Route>
 
         {/* Portal Routes */}

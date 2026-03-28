@@ -1,0 +1,36 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: saas-africa
+
+resources:
+  - namespace.yaml
+  - configmaps/app-config.yaml
+  - configmaps/nginx-config.yaml
+  - secrets/db-credentials.yaml
+  - secrets/redis-credentials.yaml
+  - secrets/api-secrets.yaml
+  - statefulsets/postgres.yaml
+  - statefulsets/redis.yaml
+  - deployments/facturepro-backend.yaml
+  - deployments/facturepro-frontend.yaml
+  - deployments/savanaflow-backend.yaml
+  - deployments/savanaflow-frontend.yaml
+  - deployments/schoolflow-backend.yaml
+  - deployments/schoolflow-frontend.yaml
+  - deployments/celery-worker.yaml
+  - deployments/celery-beat.yaml
+  - services/backend-services.yaml
+  - services/frontend-services.yaml
+  - ingress.yaml
+  - monitoring/servicemonitor.yaml
+  - monitoring/prometheus-rules.yaml
+  - monitoring/network-policies.yaml
+  - monitoring/pod-disruption-budgets.yaml
+
+commonLabels:
+  app.kubernetes.io/managed-by: kustomize
+  app.kubernetes.io/part-of: saas-africa-platform
+
+commonAnnotations:
+  app.kubernetes.io/version: "2.0.0"

@@ -1,0 +1,55 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: facturepro-backend-pdb
+  namespace: saas-africa
+  labels:
+    app.kubernetes.io/name: facturepro-backend-pdb
+    app.kubernetes.io/component: policy
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: facturepro-backend
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: savanaflow-backend-pdb
+  namespace: saas-africa
+  labels:
+    app.kubernetes.io/name: savanaflow-backend-pdb
+    app.kubernetes.io/component: policy
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: savanaflow-backend
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: schoolflow-backend-pdb
+  namespace: saas-africa
+  labels:
+    app.kubernetes.io/name: schoolflow-backend-pdb
+    app.kubernetes.io/component: policy
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: schoolflow-backend
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: celery-worker-pdb
+  namespace: saas-africa
+  labels:
+    app.kubernetes.io/name: celery-worker-pdb
+    app.kubernetes.io/component: policy
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: celery-worker
