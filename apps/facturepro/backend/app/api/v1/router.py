@@ -7,10 +7,18 @@ from app.api.v1.endpoints import (
     products, purchase_orders, quotes, recurring,
     reports, suppliers, users,
 )
+from app.api.v1.endpoints import ai
 from app.api.v1.endpoints.client_portal import (
     public_router as portal_public_router,
     auth_router as portal_auth_router,
     portal_router,
+)
+from app.api.v1.endpoints.accounting import (
+    router as accounting_router,
+    auto_router as accounting_auto_router,
+    reconciliation_router as accounting_reconciliation_router,
+    tax_router as accounting_tax_router,
+    reports_router as accounting_reports_router,
 )
 
 api_router = APIRouter(prefix="/api/v1")
@@ -39,3 +47,13 @@ api_router.include_router(reports.router)
 api_router.include_router(portal_public_router)
 api_router.include_router(portal_auth_router)
 api_router.include_router(portal_router)
+
+# Accounting routes (OHADA)
+api_router.include_router(accounting_router)
+api_router.include_router(accounting_auto_router)
+api_router.include_router(accounting_reconciliation_router)
+api_router.include_router(accounting_tax_router)
+api_router.include_router(accounting_reports_router)
+
+# AI Services routes
+api_router.include_router(ai.router)

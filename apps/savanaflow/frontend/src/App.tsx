@@ -17,6 +17,14 @@ import EmployeeFormPage from './pages/employees/EmployeeFormPage'
 import EmployeeDetailPage from './pages/employees/EmployeeDetailPage'
 import ShiftsPage from './pages/employees/ShiftsPage'
 import CommissionPage from './pages/employees/CommissionPage'
+// E-commerce pages
+import EcommercePage from './pages/ecommerce/EcommercePage'
+import StoreSettingsPage from './pages/ecommerce/StoreSettingsPage'
+import ProductsOnlinePage from './pages/ecommerce/ProductsOnlinePage'
+import OrdersPage from './pages/ecommerce/OrdersPage'
+import OrderDetailPage from './pages/ecommerce/OrderDetailPage'
+import DeliveryZonesPage from './pages/ecommerce/DeliveryZonesPage'
+import CouponsPage from './pages/ecommerce/CouponsPage'
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const user = useAuthStore(s => s.user)
@@ -49,6 +57,15 @@ export default function App() {
           <Route path="employees/:id/edit" element={<EmployeeFormPage />} />
           <Route path="shifts" element={<ShiftsPage />} />
           <Route path="commissions" element={<CommissionPage />} />
+          {/* E-commerce routes */}
+          <Route path="ecommerce" element={<EcommercePage />} />
+          <Route path="ecommerce/stores/new" element={<StoreSettingsPage />} />
+          <Route path="ecommerce/stores/:id" element={<StoreSettingsPage />} />
+          <Route path="ecommerce/products" element={<ProductsOnlinePage />} />
+          <Route path="ecommerce/orders" element={<OrdersPage />} />
+          <Route path="ecommerce/orders/:id" element={<OrderDetailPage />} />
+          <Route path="ecommerce/delivery" element={<DeliveryZonesPage />} />
+          <Route path="ecommerce/coupons" element={<CouponsPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

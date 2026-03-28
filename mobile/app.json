@@ -1,0 +1,48 @@
+{
+  "expo": {
+    "name": "SaaS Africa",
+    "slug": "saas-africa",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "saasafrica",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#2563eb"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.saasafrica.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Accès caméra pour scanner les codes-barres et documents",
+        "NSBluetoothAlwaysUsageDescription": "Accès Bluetooth pour l'impression des tickets"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#2563eb"
+      },
+      "package": "com.saasafrica.app",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.BLUETOOTH_SCAN"
+      ]
+    },
+    "plugins": [
+      "expo-camera",
+      "expo-secure-store",
+      "expo-notifications"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "saas-africa-mobile"
+      }
+    }
+  }
+}

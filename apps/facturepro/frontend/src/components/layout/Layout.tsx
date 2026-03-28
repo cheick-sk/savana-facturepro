@@ -17,7 +17,11 @@ import {
   TrendingUp,
   HelpCircle,
   ShoppingBag,
-  Truck
+  Truck,
+  BookOpen,
+  ClipboardList,
+  Calendar,
+  PieChart
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuthStore } from '../../store/auth'
@@ -46,6 +50,15 @@ const NAV_ITEMS = [
     items: [
       { to: '/purchase-orders', icon: ShoppingBag, label: 'Commandes fournisseur' },
       { to: '/supplier-invoices', icon: Truck, label: 'Factures fournisseurs' },
+    ]
+  },
+  {
+    section: 'Comptabilité',
+    items: [
+      { to: '/accounting/chart', icon: BookOpen, label: 'Plan comptable' },
+      { to: '/accounting/entries', icon: ClipboardList, label: 'Écritures' },
+      { to: '/accounting/fiscal-years', icon: Calendar, label: 'Exercices' },
+      { to: '/accounting/reports', icon: PieChart, label: 'États financiers' },
     ]
   }
 ]

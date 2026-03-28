@@ -18,6 +18,7 @@ celery_app = Celery(
         "app.tasks.reports",
         "app.tasks.sync",
         "app.tasks.loyalty",
+        "app.tasks.ecommerce",
     ]
 )
 
@@ -77,6 +78,21 @@ celery_app.conf.update(
         "loyalty-tier-notifications": {
             "task": "app.tasks.loyalty.send_tier_upgrade_notifications",
             "schedule": crontab(hour=9, minute=0),
+        },
+        # E-commerce: Sync inventory from POS every 30 minutes
+        "ecommerce-sync-inventory": {
+            "task": "app.tasks.ecommerce.sync_inventory_from_pos",
+            "schedule": crontab(minute="*/30"),
+        },
+        # E-commerce: Cleanup abandoned orders hourly
+        "ecommerce-cleanup-orders": {
+            "task": "app.tasks.ecommerce.cleanup_abandoned_orders",
+            "schedule": crontab(minute=0),
+        },
+        # E-commerce: Generate daily report at 7 AM
+        "ecommerce-daily-report": {
+            "task": "app.tasks.ecommerce.generate_daily_ecommerce_report",
+            "schedule": crontab(hour=7, minute=0),
         },
     },
 )

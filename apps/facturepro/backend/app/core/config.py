@@ -89,6 +89,12 @@ class Settings(BaseSettings):
     EXCHANGE_RATE_API_KEY: str = ""
     EXCHANGE_RATE_CACHE_HOURS: int = 24
 
+    # AI Configuration
+    AI_ENABLED: bool = True
+    AI_API_KEY: str = ""  # API key for AI services (Gemini, OpenAI, etc.)
+    AI_PROVIDER: str = "gemini"  # 'gemini', 'openai', 'anthropic'
+    AI_VISION_MODEL: str = "gemini-1.5-flash"  # Model for OCR tasks
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]

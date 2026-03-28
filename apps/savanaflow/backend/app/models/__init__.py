@@ -6,6 +6,10 @@ from app.models.all_models import (
     StoreTransfer, Supplier, TransferItem, User,
     Employee, EmployeeStore, ShiftRecord, EmployeeCommission, EmployeePermission,
 )
+from app.models.ecommerce import (
+    OnlineStore, OnlineProduct, OnlineCategory, OnlineCustomer,
+    Cart, CartItem, OnlineOrder, OnlineOrderItem, DeliveryZone, Coupon,
+)
 
 __all__ = [
     "User", "Store",
@@ -21,4 +25,7 @@ __all__ = [
     "PurchaseOrder", "PurchaseOrderItem",
     "AuditLog",
     "Employee", "EmployeeStore", "ShiftRecord", "EmployeeCommission", "EmployeePermission",
+    # E-commerce models
+    "OnlineStore", "OnlineProduct", "OnlineCategory", "OnlineCustomer",
+    "Cart", "CartItem", "OnlineOrder", "OnlineOrderItem", "DeliveryZone", "Coupon",
 ]

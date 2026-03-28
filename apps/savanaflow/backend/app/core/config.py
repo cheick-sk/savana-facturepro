@@ -38,6 +38,14 @@ class Settings(BaseSettings):
     RATE_LIMIT_REQUESTS: int = 100
     RATE_LIMIT_WINDOW_SECONDS: int = 60
 
+    # AI Configuration
+    AI_ENABLED: bool = True
+    AI_API_KEY: str = ""  # API key for AI services
+    AI_PROVIDER: str = "gemini"  # 'gemini', 'openai', 'anthropic'
+    PREDICTION_MIN_DATA_POINTS: int = 14  # Minimum data points for predictions
+    PREDICTION_DEFAULT_LEAD_TIME: int = 7  # Default supplier lead time in days
+    PREDICTION_SERVICE_LEVEL: float = 0.95  # Target service level (95%)
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]

@@ -19,6 +19,16 @@ import ReportsPage from './pages/reports/ReportsPage'
 import PurchaseOrdersPage from './pages/purchase/PurchaseOrdersPage'
 import SupplierInvoicesPage from './pages/purchase/SupplierInvoicesPage'
 
+// Accounting pages
+import ChartOfAccountsPage from './pages/accounting/ChartOfAccountsPage'
+import JournalEntriesPage from './pages/accounting/JournalEntriesPage'
+import JournalEntryFormPage from './pages/accounting/JournalEntryFormPage'
+import FiscalYearsPage from './pages/accounting/FiscalYearsPage'
+import AccountingReportsPage from './pages/accounting/AccountingReportsPage'
+import TrialBalancePage from './pages/accounting/TrialBalancePage'
+import BalanceSheetPage from './pages/accounting/BalanceSheetPage'
+import IncomeStatementPage from './pages/accounting/IncomeStatementPage'
+
 // Portal imports
 import PortalLoginPage from './pages/portal/PortalLoginPage'
 import PortalLayout from './components/portal/PortalLayout'
@@ -225,6 +235,16 @@ export default function App() {
           {/* Purchase routes */}
           <Route path="purchase-orders" element={<PurchaseOrdersPage />} />
           <Route path="supplier-invoices" element={<SupplierInvoicesPage />} />
+
+          {/* Accounting routes */}
+          <Route path="accounting/chart" element={<ChartOfAccountsPage />} />
+          <Route path="accounting/entries" element={<JournalEntriesPage />} />
+          <Route path="accounting/entries/new" element={<JournalEntryFormPage />} />
+          <Route path="accounting/fiscal-years" element={<FiscalYearsPage />} />
+          <Route path="accounting/reports" element={<AccountingReportsPage />} />
+          <Route path="accounting/reports/trial-balance" element={<TrialBalancePage />} />
+          <Route path="accounting/reports/balance-sheet" element={<BalanceSheetPage />} />
+          <Route path="accounting/reports/income-statement" element={<IncomeStatementPage />} />
         </Route>
 
         {/* Portal Routes */}

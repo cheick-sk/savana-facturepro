@@ -2,7 +2,8 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { 
   ShoppingCart, Package, BarChart2, Warehouse, LayoutDashboard, Store, LogOut, 
   Menu, X, ChevronLeft, ChevronRight, Bell, Settings, Search, 
-  TrendingUp, Users, HelpCircle, Moon, Sun, Gift, UserCog, Clock, DollarSign
+  TrendingUp, Users, HelpCircle, Moon, Sun, Gift, UserCog, Clock, DollarSign,
+  Globe, Truck, Tag
 } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { useAuthStore } from '../../store/auth'
@@ -13,6 +14,11 @@ const NAV_ITEMS = [
   { to: '/products', icon: Package, label: 'Produits', section: 'inventory' },
   { to: '/stock', icon: Warehouse, label: 'Stock', section: 'inventory' },
   { to: '/stores', icon: Store, label: 'Magasins', section: 'inventory' },
+  { to: '/ecommerce', icon: Globe, label: 'E-commerce', section: 'ecommerce' },
+  { to: '/ecommerce/products', icon: Package, label: 'Produits en ligne', section: 'ecommerce' },
+  { to: '/ecommerce/orders', icon: ShoppingCart, label: 'Commandes', section: 'ecommerce' },
+  { to: '/ecommerce/delivery', icon: Truck, label: 'Livraison', section: 'ecommerce' },
+  { to: '/ecommerce/coupons', icon: Tag, label: 'Promotions', section: 'ecommerce' },
   { to: '/employees', icon: UserCog, label: 'Employés', section: 'hr' },
   { to: '/shifts', icon: Clock, label: 'Shifts', section: 'hr' },
   { to: '/commissions', icon: DollarSign, label: 'Commissions', section: 'hr' },
@@ -23,6 +29,7 @@ const NAV_ITEMS = [
 const SECTIONS = {
   main: { label: 'Principal', collapsed: false },
   inventory: { label: 'Gestion', collapsed: false },
+  ecommerce: { label: 'E-commerce', collapsed: false },
   hr: { label: 'Ressources Humaines', collapsed: false },
   customers: { label: 'Clients', collapsed: false },
   analytics: { label: 'Analyse', collapsed: false },

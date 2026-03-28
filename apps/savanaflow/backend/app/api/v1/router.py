@@ -8,6 +8,9 @@ from app.api.v1.endpoints import (
     employees,
 )
 from app.api.v1.endpoints import loyalty
+from app.api.v1.endpoints import ecommerce
+from app.api.v1.endpoints import storefront
+from app.api.v1.endpoints import predictions
 
 api_router = APIRouter(prefix="/api/v1")
 
@@ -31,3 +34,10 @@ api_router.include_router(employees.shift_router)
 api_router.include_router(employees.commission_router)
 # Loyalty program
 api_router.include_router(loyalty.router)
+# E-commerce module
+api_router.include_router(ecommerce.router)
+api_router.include_router(storefront.router)
+
+# AI Predictions and Insights
+api_router.include_router(predictions.router)
+api_router.include_router(predictions.insights_router)
